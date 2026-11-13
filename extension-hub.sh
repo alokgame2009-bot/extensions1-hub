@@ -266,31 +266,53 @@ blueprint_menu() {
   done
 }
 
+
+center_line() {
+  local text="$1"
+  local cols pad len
+
+  cols=$(tput cols 2>/dev/null || echo 100)
+  len=${#text}
+  pad=$(( (cols - len) / 2 ))
+
+  (( pad < 0 )) && pad=0
+
+  printf '%*s%s\n' "$pad" '' "$text"
+}
+
 placeholder_menu() {
   local title="$1"
   clear 2>/dev/null || true
+
   printf '\033[1;94m'
-  echo "╔══════════════════════════════════╗"
-  printf '║ %-32s ║\n' "$title"
-  echo "╚══════════════════════════════════╝"
+  center_line "╔══════════════════════════════════╗"
+  center_line "$(printf '║ %-32s ║' "$title")"
+  center_line "╚══════════════════════════════════╝"
   printf '\033[0m'
+
   echo
   warn "This section is not implemented yet; no fake install actions are shown."
   pause
 }
 
 show_logo() {
+  local line
+
   printf '\033[1;94m'
-  cat <<'LOGO'
+
+  while IFS= read -r line; do
+    center_line "$line"
+  done <<'LOGO'
 ███████╗██╗  ██╗████████╗███████╗███╗   ██╗███████╗██╗ ██████╗ ███╗   ██╗  ██╗  ██╗██╗   ██╗██████╗
 ██╔════╝╚██╗██╔╝╚══██╔══╝██╔════╝████╗  ██║██╔════╝██║██╔═══██╗████╗  ██║  ██║  ██║██║   ██║██╔══██╗
 █████╗   ╚███╔╝    ██║   █████╗  ██╔██╗ ██║███████╗██║██║   ██║██╔██╗ ██║  ███████║██║   ██║██████╔╝
 ██╔══╝   ██╔██╗    ██║   ██╔══╝  ██║╚██╗██║╚════██║██║██║   ██║██║╚██╗██║  ██╔══██║██║   ██║██╔══██╗
 ███████╗██╔╝ ██╗   ██║   ███████╗██║ ╚████║███████║██║╚██████╔╝██║ ╚████║  ██║  ██║╚██████╔╝██████╔╝
-╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
+╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
 LOGO
+
   printf '\033[1;96m'
-  echo "                   E X T E N S I O N   H U B"
+  center_line "E X T E N S I O N   H U B"
   printf '\033[0m'
 }
 
@@ -302,29 +324,32 @@ main_menu() {
     echo
 
     printf '\033[1;96m'
-    echo "         PTERODACTYL EXTENSION MANAGER"
+    center_line "PTERODACTYL EXTENSION MANAGER"
     printf '\033[0m'
 
     printf '\033[1;94m'
-    echo "          Manage • Customize • Extend"
+    center_line "Manage • Customize • Extend"
     printf '\033[0m'
 
     echo
+
     printf '\033[1;94m'
-    echo "  ╔══════════════════════════════════╗"
+    center_line "╔══════════════════════════════════╗"
     printf '\033[1;97m'
-    printf "  ║  Version       : %-16s║\n" "$APP_VERSION"
-    printf "  ║  Made by       : %-16s║\n" "$AUTHOR"
-    printf "  ║  Panel Version : %-16s║\n" "1.x.x"
+    center_line "$(printf '║  Version       : %-16s║' "$APP_VERSION")"
+    center_line "$(printf '║  Made by       : %-16s║' "$AUTHOR")"
+    center_line "$(printf '║  Panel Version : %-16s║' "1.x.x")"
     printf '\033[1;94m'
-    echo "  ╚══════════════════════════════════╝"
+    center_line "╚══════════════════════════════════╝"
     printf '\033[0m'
 
     echo
+
     printf '\033[1;90m'
-    echo "       © 2026 Extension Hub"
-    echo "          All Rights Reserved"
+    center_line "© 2026 Extension Hub"
+    center_line "All Rights Reserved"
     printf '\033[0m'
+
     echo
 
     # Existing menu options and input handling continue below.
