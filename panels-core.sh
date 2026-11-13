@@ -60,14 +60,12 @@ playtely_panel_menu() {
         
         printf "${C_PINK}"
         cat << 'EOF'
- _____  _                     _            _         _ 
-|  __ \| |                   | |          | |       | |
-| |__) | |_ ___ _ __ ___   __| | __ _  ___| |_ _   _| |
-|  ___/| __/ _ \ '__/ _ \ / _` |/ _` |/ __| __| | | | |
-| |    | ||  __/ | | (_) | (_| | (_| | (__| |_| |_| | |
-|_|     \__\___|_|  \___/ \__,_|\__,_|\___|\__|\__, |_|
-                                                 __/ |  
-                                                |___/   
+██████╗ ██╗      █████╗ ██╗   ██╗████████╗███████╗██╗  ██╗
+██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔════╝██║  ██║
+██████╔╝██║     ███████║ ╚████╔╝    ██║   █████╗  ███████║
+██╔═══╝ ██║     ██╔══██║  ╚██╔╝     ██║   ██╔══╝  ██╔══██║
+██║     ███████╗██║  ██║   ██║      ██║   ███████╗██║  ██║
+╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
 EOF
         printf "${C_RESET}\n"
 
@@ -94,19 +92,27 @@ EOF
 
         read -r -p " λ Select Option: " p_choice || return
         
+        # SMART LOADING: Try local, then GitHub
         local INSTALLER_SCRIPT="/opt/extension-hub/nexyoncloud-installer.sh"
         
+        if [[ ! -f "$INSTALLER_SCRIPT" ]]; then
+            # Fallback to GitHub if not found locally
+            INSTALLER_SCRIPT="/tmp/nexyoncloud-installer.sh"
+            if [[ ! -f "$INSTALLER_SCRIPT" ]]; then
+                curl -fsSL "https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main/nexyoncloud-installer.sh" -o "$INSTALLER_SCRIPT" 2>/dev/null || true
+            fi
+        fi
+
         if [[ -f "$INSTALLER_SCRIPT" ]]; then
             source "$INSTALLER_SCRIPT"
         else
-            warn "NexyonCloud Installer script not found!"
+            warn "NexyonCloud Installer script not found! (Check GitHub repo)"
             pause
             continue
         fi
 
         case "$p_choice" in
             1) 
-                # Yahan aapka naya input_config call hoga
                 if input_config; then
                     echo "[1/6] Installing dependencies..."
                     install_deps
