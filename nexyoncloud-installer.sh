@@ -70,20 +70,23 @@ install_deps(){
 }
 
 # ==========================================
-# NAYA PREMIUM INPUT CONFIG (Jo aapne manga)
+# PREMIUM INPUT CONFIG (Blue Logo + Real Install)
 # ==========================================
 input_config(){
   clear
-  echo "               .                                      .o8                          .               oooo  "
-  echo "             .o8                                     \"888                        .o8               \`888  "
-  echo "oo.ooooo.  .o888oo  .ooooo.  oooo d8b  .ooooo.   .oooo888   .oooo.    .ooooo.  .o888oo oooo    ooo  888  "
-  echo " 888' \`88b   888   d88' \`88b \`888\"\"8P d88' \`88b d88' \`888  \`P  )88b  d88' \`\"Y8   888    \`88.  .8'   888  "
-  echo " 888   888   888   888ooo888  888     888   888 888   888   .oP\"888  888         888     \`88..8'    888  "
-  echo " 888   888   888 . 888    .o  888     888   888 888   888  d8(  888  888   .o8   888 .    \`888'     888  "
-  echo " 888bod8P'   \"888\" \`Y8bod8P' d888b    \`Y8bod8P' \`Y8bod88P\" \`Y888\"\"8o \`Y8bod8P'   \"888\"     .8'     o888o "
-  echo " 888                                                                                   .o..P'            "
-  echo "o888o                                                                                  \`Y8P'             "
-  echo "                                                                                                         "
+  printf '\033[1;94m' # Blue Color Start
+  cat << "EOF"
+               .                                      .o8                          .               oooo  
+             .o8                                     "888                        .o8               `888  
+oo.ooooo.  .o888oo  .ooooo.  oooo d8b  .ooooo.   .oooo888   .oooo.    .ooooo.  .o888oo oooo    ooo  888  
+ 888' `88b   888   d88' `88b `888""8P d88' `88b d88' `888  `P  )88b  d88' `"Y8   888    `88.  .8'   888  
+ 888   888   888   888ooo888  888     888   888 888   888   .oP"888  888         888     `88..8'    888  
+ 888   888   888 . 888    .o  888     888   888 888   888  d8(  888  888   .o8   888 .    `888'     888  
+ 888bod8P'   "888" `Y8bod8P' d888b    `Y8bod8P' `Y8bod88P" `Y888""8o `Y8bod8P'   "888"     .8'     o888o 
+ 888                                                                                   .o..P'            
+o888o                                                                                  `Y8P'             
+EOF
+  printf '\033[0m' # Color Reset
   echo "           PREMIUM PTERODACTYL INSTALLER"
   echo "────────────────────────────────────────────────────────────"
 
