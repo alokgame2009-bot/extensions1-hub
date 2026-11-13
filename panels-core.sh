@@ -60,14 +60,12 @@ playtely_panel_menu() {
         
         printf "${C_PINK}"
         cat << 'EOF'
- _____  _                     _            _         _ 
-|  __ \| |                   | |          | |       | |
-| |__) | |_ ___ _ __ ___   __| | __ _  ___| |_ _   _| |
-|  ___/| __/ _ \ '__/ _ \ / _` |/ _` |/ __| __| | | | |
-| |    | ||  __/ | | (_) | (_| | (_| | (__| |_| |_| | |
-|_|     \__\___|_|  \___/ \__,_|\__,_|\___|\__|\__, |_|
-                                                 __/ |  
-                                                |___/   
+██████╗ ██╗      █████╗ ██╗   ██╗████████╗███████╗██╗  ██╗
+██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔════╝██║  ██║
+██████╔╝██║     ███████║ ╚████╔╝    ██║   █████╗  ███████║
+██╔═══╝ ██║     ██╔══██║  ╚██╔╝     ██║   ██╔══╝  ██╔══██║
+██║     ███████╗██║  ██║   ██║      ██║   ███████╗██║  ██║
+╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
 EOF
         printf "${C_RESET}\n"
 
@@ -123,10 +121,8 @@ EOF
                 pause 
                 ;;
             2) 
-                # PREMIUM USER MANAGEMENT MENU
                 while true; do
                     clear
-                    local cols=$(tput cols 2>/dev/null || echo 80)
                     printf "${C_CYAN}╔══════════════════════════════════════════════════════════════════════╗${C_RESET}\n"
                     printf "${C_CYAN}║${C_RESET} ${C_WHITE}❖${C_RESET} ${C_BOLD}PTERODACTYL SERVER MANAGEMENT SYSTEM${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
                     printf "${C_CYAN}╚══════════════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
@@ -143,24 +139,18 @@ EOF
                     read -r -p " λ Choose option: " u_choice
                     
                     case "$u_choice" in
-                        1) 
-                            printf "\n ${C_YELLOW}[ ⏳ ]${C_RESET} Launching manual user creation...\n"
-                            sleep 1
-                            create_user_manual
-                            break 
-                            ;;
-                        2) 
-                            printf "\n ${C_YELLOW}[ ⏳ ]${C_RESET} Launching auto admin creation...\n"
-                            sleep 1
-                            create_user_auto
-                            break 
-                            ;;
+                        1) printf "\n ${C_YELLOW}[ ⏳ ]${C_RESET} Launching manual user creation...\n"; sleep 1; create_user_manual; break ;;
+                        2) printf "\n ${C_YELLOW}[ ⏳ ]${C_RESET} Launching auto admin creation...\n"; sleep 1; create_user_auto; break ;;
                         0) break ;;
                         *) warn "Invalid option."; sleep 1 ;;
                     esac
                 done
                 ;;
-            3) update_panel; pause ;;
+            3) 
+                # YAHAN UPDATE PANEL CALL HO RAHA HAI
+                update_panel
+                pause 
+                ;;
             4) clear; warn "Domain/SSL management coming soon."; pause ;;
             5) uninstall_panel; pause ;;
             6) clear; warn "phpmyadmin setup coming soon."; pause ;;
