@@ -290,7 +290,7 @@ show_logo() {
 ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
 LOGO
   printf '\033[1;96m'
-  echo "              E X T E N S I O N   H U B"
+  echo "                   E X T E N S I O N   H U B"
   printf '\033[0m'
 }
 
@@ -302,7 +302,7 @@ main_menu() {
     echo
 
     printf '\033[1;96m'
-    echo "       PTERODACTYL EXTENSION MANAGER"
+    echo "         PTERODACTYL EXTENSION MANAGER"
     printf '\033[0m'
 
     printf '\033[1;94m'
