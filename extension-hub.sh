@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Extension Hub v4.0 - Premium UI (Top Bar + 3D Logo + Grid Menu)
+# Extension Hub v5.0 - Masterpiece Edition (Photo 2 Finish)
 # Made by Ziro | Powered by NexyonCloud
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v4.0"
+APP_VERSION="v5.0"
 AUTHOR="Ziro"
 PANEL_DIR="${PTERODACTYL_DIRECTORY:-/var/www/pterodactyl}"
 BLUEPRINT_RELEASE_URL="https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip"
@@ -21,9 +21,13 @@ if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
   C_RED=$'\033[38;5;203m'; C_WHITE=$'\033[97m'
   C_PURPLE=$'\033[38;5;135m'; C_PINK=$'\033[38;5;213m'
   C_GRAY=$'\033[38;5;240m'
+  # Background colors for the pills
+  C_BG_BLUE=$'\033[48;5;18m'; C_BG_PURPLE=$'\033[48;5;53m'
+  C_BG_GREEN=$'\033[48;5;22m'; C_BG_RED=$'\033[48;5;52m'
 else
   C_RESET=""; C_BOLD=""; C_DIM=""; C_CYAN=""; C_BLUE=""
   C_GREEN=""; C_YELLOW=""; C_RED=""; C_WHITE=""; C_PURPLE=""; C_PINK=""; C_GRAY=""
+  C_BG_BLUE=""; C_BG_PURPLE=""; C_BG_GREEN=""; C_BG_RED=""
 fi
 
 # ---------- cleanup ----------
@@ -65,7 +69,8 @@ get_network_status() {
     if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}● CONNECTED${C_RESET}"; else printf "${C_RED}● DISCONNECTED${C_RESET}"; fi
 }
 get_uptime() {
-    uptime -p 2>/dev/null | sed 's/up //' || echo "Unknown"
+    # Short format for top bar (e.g., 5 days, 1 hour)
+    uptime -p 2>/dev/null | sed 's/up //; s/ weeks/ weeks,/; s/ days/ days,/' || echo "Unknown"
 }
 get_disk_usage() {
     df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"
@@ -82,13 +87,15 @@ center_line() {
     local text="$1"
     local cols
     cols=$(tput cols 2>/dev/null || echo 80)
-    local len=${#text}
+    # Strip ANSI color codes to calculate actual string length
+    local clean_text=$(printf "%s" "$text" | sed 's/\x1b\[[0-9;]*m//g')
+    local len=${#clean_text}
     local padding=$(( (cols - len) / 2 ))
     if [ "$padding" -lt 0 ]; then padding=0; fi
     printf "%${padding}s%s\n" "" "$text"
 }
 
-# Draw Top Bar (User, Uptime, Disk, RAM, CPU)
+# Draw Top Bar (Photo 2 Style Pills)
 draw_top_bar() {
     local user=$(get_current_user)
     local up=$(get_uptime)
@@ -96,17 +103,21 @@ draw_top_bar() {
     local ram=$(get_ram_usage)
     local cpu=$(get_cpu_usage)
     
-    printf "  ${C_CYAN} %s${C_RESET}   " "$user"
-    printf "${C_GRAY}│${C_RESET}   ${C_YELLOW} %s${C_RESET}   " "$up"
-    printf "${C_GRAY}│${C_RESET}   ${C_PURPLE} %s${C_RESET}   " "$disk"
-    printf "${C_GRAY}│${C_RESET}   ${C_RED} RAM: %s%%${C_RESET}   " "$ram"
-    printf "${C_GRAY}│${C_RESET}   ${C_GREEN}CPU: %s%%${C_RESET}\n" "$cpu"
+    # Building the pill strings
+    local p1="${C_BG_BLUE}${C_WHITE}  ${user} ${C_RESET}"
+    local p2="${C_BG_PURPLE}${C_WHITE}  ${up} ${C_RESET}"
+    local p3="${C_BG_GREEN}${C_WHITE}  ${disk} ${C_RESET}"
+    local p4="${C_BG_RED}${C_WHITE}  RAM ${ram}% ${C_RESET}"
+    local p5="${C_BG_GREEN}${C_WHITE} CPU ${cpu}% ${C_RESET}"
+    
+    # Print with spacing
+    printf "  %s  %s  %s  %s  %s\n" "$p1" "$p2" "$p3" "$p4" "$p5"
 }
 
-# Draw EXTENSION HUB 3D Logo
+# Draw 3D Block Logo (Photo 2 Style)
 show_logo() {
     local line
-    printf "${C_BLUE}"
+    printf "${C_CYAN}"
     while IFS= read -r line; do
         center_line "$line"
     done <<'LOGO'
@@ -118,7 +129,7 @@ show_logo() {
 ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ 
 LOGO
     printf "${C_RESET}\n"
-    center_line "${C_PURPLE}Z I R O   E D I T I O N   —   O B S I D I A N   N E X T   G E N${C_RESET}"
+    center_line "${C_YELLOW}Z I R O   E D I T I O N   —   O B S I D I A N   N E X T   G E N${C_RESET}"
     center_line "${C_GRAY}Powered by NexyonCloud${C_RESET}"
     echo ""
 }
