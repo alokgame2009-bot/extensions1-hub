@@ -11,8 +11,21 @@ command_exists() { command -v "$1" >/dev/null 2>&1; }
 valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/composer.json" ]]; }
 detect_web_user() { id www-data >/dev/null 2>&1 && echo "www-data" || (id nginx >/dev/null 2>&1 && echo "nginx" || echo "apache"); }
 detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]]; }
-panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
-blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
+
+panel_version() { 
+    valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"
+}
+
+blueprint_version() { 
+    local ver=""
+    if [[ -f "$PANEL_DIR/blueprint.sh" ]]; then
+        ver=$(grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1)
+    fi
+    if [[ -z "$ver" && -f "$PANEL_DIR/.blueprintrc" ]]; then
+        ver=$(grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/.blueprintrc" | head -n1)
+    fi
+    echo "${ver:-Unknown}"
+}
 
 make_backup() {
   valid_panel_dir || { err "Panel directory invalid."; return 1; }
