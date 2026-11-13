@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Extension Hub v1.0 - Fully Fixed
+# Extension Hub v1.2 - Fully Working (With Status Dots)
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.0"
+APP_VERSION="v1.2"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
 BASE_URL="https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main"
 PANEL_DIR="/var/www/pterodactyl"
 EXT_DIR="/var/www/pterodactyl/extensions"
+EXT_GITHUB_RAW="https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main/extensions"
 
 # ---------- colors ----------
 if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
@@ -45,7 +46,7 @@ blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
 # ==========================================
-# SYSTEM STATS FUNCTIONS (YAHAN FIX HAI)
+# SYSTEM STATS FUNCTIONS
 # ==========================================
 get_cpu_usage() { 
     local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
@@ -67,23 +68,65 @@ get_current_user() { echo "${USER:-root}"; }
 install_ext() {
     local ext_id="$1"
     local ext_name="$2"
+    local file_name="${ext_name}.blueprint"
+    local download_url="${EXT_GITHUB_RAW}/${file_name}"
+    local tmp_file="/tmp/${file_name}"
+    
     info "Installing Extension: $ext_name (ID: $ext_id)"
-    sleep 0.5
-    ok "Installed $ext_name"
+    
+    if [[ ! -d "$PANEL_DIR" ]]; then
+        err "Panel directory not found."
+        return 1
+    fi
+
+    if ! curl -fsSL --retry 3 "$download_url" -o "$tmp_file"; then
+        err "Failed to download $file_name from GitHub."
+        return 1
+    fi
+
+    cd "$PANEL_DIR" || return 1
+    if php artisan blueprint:install "$tmp_file"; then
+        ok "Installed $ext_name successfully."
+    else
+        err "Failed to install $ext_name."
+    fi
+    
+    php artisan view:clear >/dev/null 2>&1
+    php artisan config:clear >/dev/null 2>&1
+    php artisan cache:clear >/dev/null 2>&1
+    
+    rm -f "$tmp_file"
 }
 
 remove_ext() {
     local ext_id="$1"
     local ext_name="$2"
+    
     info "Removing Extension: $ext_name (ID: $ext_id)"
-    sleep 0.5
-    ok "Removed $ext_name"
+    
+    if [[ ! -d "$PANEL_DIR" ]]; then
+        err "Panel directory not found."
+        return 1
+    fi
+
+    cd "$PANEL_DIR" || return 1
+    
+    if php artisan blueprint:remove "$ext_name"; then
+        ok "Removed $ext_name successfully."
+    else
+        err "Failed to remove $ext_name."
+    fi
+    
+    php artisan view:clear >/dev/null 2>&1
+    php artisan config:clear >/dev/null 2>&1
+    php artisan cache:clear >/dev/null 2>&1
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU
+# EXTENSIONS GRID MENU (With Status Dots)
 # ==========================================
 playtely_extensions_menu() {
+    # 66 Extensions List
     local extensions=(
         "1|adminauditlogs" "2|huxregister" "3|loader" "4|lyrdyannounce"
         "5|mclogs" "6|mcplugins" "7|mctools" "8|minecraftplayermanager"
@@ -108,8 +151,10 @@ playtely_extensions_menu() {
 
     while true; do
         clear 2>/dev/null || true
+        
+        # Header
         printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
-        printf "${C_CYAN}║${C_RESET}                     ${C_PINK}Nobita.dev CONTROL HUB${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
+        printf "${C_CYAN}║${C_RESET}                     ${C_PINK}Ziro.dev CONTROL HUB${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
         printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
 
         local half=$(( (${#extensions[@]} + 1) / 2 ))
@@ -117,25 +162,42 @@ playtely_extensions_menu() {
             IFS='|' read -r id1 name1 <<< "${extensions[$i]}"
             local right_index=$((i + half))
             
+            # Left Column
             local sel1="[-]"; local col1="${C_GRAY}"
             for s in "${selected_extensions[@]}"; do 
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
-            printf " ${col1}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-25s${C_RESET}" "$sel1" "$id1" "$name1"
             
+            # Status Check Left
+            local status1="○"; local status_col1="${C_RED}"
+            if [[ -d "$EXT_DIR/$name1" ]] || [[ -f "$EXT_DIR/${name1}.blueprint" ]]; then
+                status1="●"; status_col1="${C_GREEN}"
+            fi
+            
+            printf " ${col1}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col1}%s${C_RESET}" "$sel1" "$id1" "$name1" "$status1"
+            
+            # Right Column
             if [ "$right_index" -lt "${#extensions[@]}" ]; then
                 IFS='|' read -r id2 name2 <<< "${extensions[$right_index]}"
                 local sel2="[-]"; local col2="${C_GRAY}"
                 for s in "${selected_extensions[@]}"; do 
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
-                printf "   ${col2}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-25s${C_RESET}" "$sel2" "$id2" "$name2"
+                
+                # Status Check Right
+                local status2="○"; local status_col2="${C_RED}"
+                if [[ -d "$EXT_DIR/$name2" ]] || [[ -f "$EXT_DIR/${name2}.blueprint" ]]; then
+                    status2="●"; status_col2="${C_GREEN}"
+                fi
+                
+                printf "   ${col2}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col2}%s${C_RESET}" "$sel2" "$id2" "$name2" "$status2"
             fi
             echo ""
         done
         echo ""
 
-        printf " ${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 75))"
+        # Footer
+        printf " ${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 80))"
         printf " ${C_WHITE}SELECTED: ${C_YELLOW}%d${C_WHITE} items${C_RESET}\n" "${#selected_extensions[@]}"
         printf " ${C_GREEN}[i] Install  ${C_RED}[r] Remove  ${C_BLUE}[a] Select All  ${C_WHITE}[c] Clear  ${C_RED}[0] Exit${C_RESET}\n\n"
         
@@ -158,7 +220,7 @@ playtely_extensions_menu() {
                             if [ "$id" == "$sel" ]; then install_ext "$id" "$name"; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ All selected extensions installed!${C_RESET}"; pause
+                    echo -e "\n${C_GREEN}✓ All selected extensions processed!${C_RESET}"; pause
                 fi
                 ;;
             "r"|"R")
@@ -171,7 +233,7 @@ playtely_extensions_menu() {
                             if [ "$id" == "$sel" ]; then remove_ext "$id" "$name"; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ All selected extensions removed!${C_RESET}"; pause
+                    echo -e "\n${C_GREEN}✓ All selected extensions processed!${C_RESET}"; pause
                 fi
                 ;;
             *)
