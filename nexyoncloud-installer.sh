@@ -69,12 +69,9 @@ install_deps(){
   fi
 }
 
-# ==========================================
-# PREMIUM INPUT CONFIG (Blue Logo + Real Install)
-# ==========================================
 input_config(){
   clear
-  printf '\033[1;94m' # Blue Color Start
+  printf '\033[1;94m'
   cat << "EOF"
                .                                      .o8                          .               oooo  
              .o8                                     "888                        .o8               `888  
@@ -86,7 +83,7 @@ oo.ooooo.  .o888oo  .ooooo.  oooo d8b  .ooooo.   .oooo888   .oooo.    .ooooo.  .
  888                                                                                   .o..P'            
 o888o                                                                                  `Y8P'             
 EOF
-  printf '\033[0m' # Color Reset
+  printf '\033[0m'
   echo "           PREMIUM PTERODACTYL INSTALLER"
   echo "────────────────────────────────────────────────────────────"
 
@@ -247,38 +244,81 @@ $(grep '^APP_KEY=' "$PANEL_DIR/.env" || true)
 EOF
 }
 
-update_panel(){
-  root
-  [[ -d "$PANEL_DIR" ]] || { echo "Pterodactyl is not installed."; pause; return; }
-  cd "$PANEL_DIR"
-  php artisan down || true
-  curl -fL --retry 3 -o /tmp/panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
-  tar -xzf /tmp/panel.tar.gz --overwrite
-  rm -f /tmp/panel.tar.gz
-  COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader --no-interaction
-  php artisan migrate --seed --force
-  php artisan view:clear
-  php artisan config:clear
-  chown -R www-data:www-data "$PANEL_DIR"
-  php artisan up
-  systemctl restart pteroq
-  echo "Panel updated successfully."
-  pause
+# ==========================================
+# USER MANAGEMENT FUNCTIONS (NEW)
+# ==========================================
+
+create_user_manual() {
+    clear
+    echo
+    echo "  Custom User Creation"
+    echo "  ────────────────────"
+    read -r -p "  • Email: " u_email
+    valid_email "$u_email" || die "Invalid email."
+    read -r -p "  • Username: " u_username
+    [[ "$u_username" =~ ^[A-Za-z0-9._-]{3,32}$ ]] || die "Invalid username."
+    read -r -p "  • First Name: " u_fname
+    read -r -p "  • Last Name: " u_lname
+    read -r -s -p "  • Password: " u_pass
+    echo
+    [[ ${#u_pass} -ge 8 ]] || die "Password must be at least 8 characters."
+    
+    echo
+    read -r -p "  Make this user an Admin? (y/n) [n]: " u_admin
+    local is_admin=0
+    [[ "$u_admin" =~ ^[Yy]$ ]] && is_admin=1
+
+    echo "  Creating user..."
+    cd "$PANEL_DIR"
+    if php artisan p:user:make \
+        --email="$u_email" \
+        --username="$u_username" \
+        --name-first="$u_fname" \
+        --name-last="$u_lname" \
+        --password="$u_pass" \
+        --admin="$is_admin"; then
+        echo "  [ OK ] User created successfully."
+    else
+        echo "  [FAIL] Could not create user."
+    fi
+    pause
 }
 
-uninstall_panel(){
-  root
-  echo
-  echo "PANEL UNINSTALL"
-  echo "This removes the Panel files, its NGINX site, queue worker, and scheduler entry."
-  read -r -p "Type REMOVE-PANEL to continue: " confirm
-  [[ "$confirm" == "REMOVE-PANEL" ]] || { echo "Cancelled."; pause; return 0; }
+create_user_auto() {
+    clear
+    echo
+    echo "  Auto Create Admin User"
+    echo "  ──────────────────────"
+    local auto_email="admin$(date +%s)@example.com"
+    local auto_user="admin$(date +%s)"
+    local auto_pass="$(secret)"
+    
+    echo "  Generating random admin details..."
+    echo "  Email: $auto_email"
+    echo "  Username: $auto_user"
+    echo "  Password: $auto_pass"
+    echo
+    read -r -p "  Proceed with these details? (y/n) [y]: " proceed
+    [[ "$proceed" =~ ^[Yy]$ || -z "$proceed" ]] || return 1
 
-  systemctl disable --now pteroq.service >/dev/null 2>&1 || true
-  rm -f /etc/systemd/system/pteroq.service /etc/cron.d/pterodactyl
-  systemctl daemon-reload >/dev/null 2>&1 || true
-  rm -f /etc/nginx/sites-enabled/pterodactyl.conf /etc/nginx/sites-available/pterodactyl.conf
-  if [[ -d "$PANEL_DIR" ]]; then rm -rf -- "$PANEL_DIR"; fi
-  echo "Panel removed."
-  pause
+    echo "  Creating admin user..."
+    cd "$PANEL_DIR"
+    if php artisan p:user:make \
+        --email="$auto_email" \
+        --username="$auto_user" \
+        --name-first="Auto" \
+        --name-last="Admin" \
+        --password="$auto_pass" \
+        --admin=1; then
+        echo "  [ OK ] Admin user created successfully."
+        echo
+        echo "  ┌─[ SAVE THESE CREDENTIALS ]"
+        echo "  │ Email:    $auto_email"
+        echo "  │ Username: $auto_user"
+        echo "  │ Password: $auto_pass"
+        echo "  └────────────────────────────"
+    else
+        echo "  [FAIL] Could not create user."
+    fi
+    pause
 }
