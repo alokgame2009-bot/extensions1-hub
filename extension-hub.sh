@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Extension Hub v5.5 - Main UI & Router (Fully Embedded)
+# Extension Hub v6.0 - Main UI & Router (Real Blueprint Integration)
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v5.5"
+APP_VERSION="v6.0"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
 BASE_URL="https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main"
+PANEL_DIR="/var/www/pterodactyl"
+BLUEPRINT_RELEASE_URL="https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip"
 
 # ---------- colors ----------
 if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
@@ -36,8 +38,12 @@ err()  { printf '%s[ERR ]%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; log ERROR "$*"; 
 pause() { echo; read -r -p "Press Enter to continue..." _ || true; }
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
+need_root() { [[ "$EUID" -eq 0 ]] || { err "Run as root."; return 1; }; }
+valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/composer.json" ]]; }
+detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]]; }
+blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
 
-# ---------- Load Core Modules (Blueprint & Panels) ----------
+# ---------- Load Core Modules ----------
 load_modules() {
     local module
     for module in "blueprint-core.sh" "panels-core.sh"; do
@@ -55,7 +61,77 @@ load_modules() {
 }
 
 # ==========================================
-# THEME MENU (Embedded Directly)
+# REAL BLUEPRINT FUNCTIONS
+# ==========================================
+install_blueprint() {
+  need_root || return 1
+  if detect_blueprint; then warn "Blueprint already installed."; return 1; fi
+  echo; warn "This installs Blueprint into: $PANEL_DIR"
+  read -r -p "Continue? [y/N]: " answer; [[ "$answer" =~ ^[Yy]$ ]] || return 0
+  
+  # Real installation steps
+  info "Installing dependencies..."
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git unzip wget zip
+  install -d -m 0755 /etc/apt/keyrings
+  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+  echo 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+  if ! command_exists yarn; then npm install --global yarn; fi
+  
+  info "Downloading latest Blueprint..."
+  TMP_DIR="$(mktemp -d)"
+  curl -fL --retry 3 "$BLUEPRINT_RELEASE_URL" -o "$TMP_DIR/release.zip"
+  cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
+  (cd "$PANEL_DIR" && unzip -o release.zip && yarn install)
+  chmod +x "$PANEL_DIR/blueprint.sh"
+  (cd "$PANEL_DIR" && bash ./blueprint.sh)
+  ok "Blueprint installed successfully."
+}
+
+update_blueprint() {
+  need_root || return 1
+  detect_blueprint || { err "Blueprint is not installed."; return 1; }
+  read -r -p "Create backup and continue? [y/N]: " answer; [[ "$answer" =~ ^[Yy]$ ]] || return 0
+  TMP_DIR="$(mktemp -d)"; curl -fL --retry 3 "$BLUEPRINT_RELEASE_URL" -o "$TMP_DIR/release.zip"
+  cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
+  (cd "$PANEL_DIR" && unzip -o release.zip && yarn install)
+  chmod +x "$PANEL_DIR/blueprint.sh"; (cd "$PANEL_DIR" && bash ./blueprint.sh)
+  ok "Blueprint update completed."
+}
+
+reinstall_blueprint() {
+  need_root || return 1
+  detect_blueprint || { err "Blueprint is not installed."; return 1; }
+  read -r -p "Continue after backup? [y/N]: " answer; [[ "$answer" =~ ^[Yy]$ ]] || return 0
+  TMP_DIR="$(mktemp -d)"; install_deps || return 1
+  curl -fL --retry 3 "$BLUEPRINT_RELEASE_URL" -o "$TMP_DIR/release.zip"
+  cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
+  (cd "$PANEL_DIR" && unzip -o release.zip && yarn install)
+  chmod +x "$PANEL_DIR/blueprint.sh"; (cd "$PANEL_DIR" && bash ./blueprint.sh)
+  ok "Blueprint reinstall completed."
+}
+
+uninstall_blueprint() {
+  need_root || return 1
+  detect_blueprint || { err "Blueprint is not detected."; return 1; }
+  warn "Automatic uninstall is disabled to prevent breaking your panel."
+  read -r -p "Create a safety backup now? [y/N]: " answer
+  [[ "$answer" =~ ^[Yy]$ ]] && make_backup
+}
+
+blueprint_info() {
+  echo
+  printf '%s\n' "Blueprint directory : $PANEL_DIR"
+  printf 'Blueprint detected  : '; detect_blueprint && echo "YES" || echo "NO"
+  printf 'Panel version       : %s\n' "$(panel_version)"
+  printf 'Blueprint version   : %s\n' "$(blueprint_version)"
+  echo
+}
+
+# ==========================================
+# THEME MENU & BLUEPRINT SUB-MENU
 # ==========================================
 playtely_theme_menu() {
     while true; do
@@ -67,24 +143,64 @@ playtely_theme_menu() {
         printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
         
         # Status
-        if [[ -d "/var/www/pterodactyl" && -f "/var/www/pterodactyl/artisan" ]]; then
+        if detect_blueprint; then
             printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
         else
             printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}○ OFFLINE${C_RESET}\n\n"
         fi
         
-        # Menu Options (Green numbers, Blue text)
+        # Menu Options
         printf "  ${C_GREEN}[1]${C_RESET} ${C_CYAN}Blueprint${C_RESET}\n"
         printf "  ${C_GREEN}[2]${C_RESET} ${C_CYAN}Theme${C_RESET}\n"
         printf "  ${C_GREEN}[3]${C_RESET} ${C_CYAN}Extensions${C_RESET}\n\n"
-        
         printf "  ${C_RED}[0]${C_RESET} ${C_RED}Exit${C_RESET}\n\n"
         
-        # Prompt
         read -r -p " ${C_GREEN}▶ Select Option :${C_RESET} " t_choice || return
         
         case "$t_choice" in
-            1) clear; printf "  ${C_CYAN}--- Blueprint Management ---${C_RESET}\n\n"; warn "Blueprint installation is handled from Panel -> [1] Pterodactyl v1 -> [1] Install."; pause ;;
+            1) 
+                # BLUEPRINT SUB-MENU (Screenshot 1 & 2 Logic)
+                while true; do
+                    clear 2>/dev/null || true
+                    printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
+                    printf "${C_CYAN}║${C_RESET}                       ${C_PINK}CONTROL PANEL UI${C_RESET}                       ${C_CYAN}║${C_RESET}\n"
+                    printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+                    
+                    printf " ${C_CYAN}BLUEPRINT PANEL${C_RESET}\n"
+                    
+                    if detect_blueprint; then
+                        printf " ${C_CYAN}Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
+                        printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Reinstall${C_RESET}\n"
+                        printf " ${C_GREEN}[2]${C_RESET} ${C_CYAN}Update${C_RESET}\n"
+                        printf " ${C_GREEN}[3]${C_RESET} ${C_CYAN}Info${C_RESET}\n"
+                        printf " ${C_GREEN}[4]${C_RESET} ${C_CYAN}Version${C_RESET}\n"
+                        printf " ${C_RED}[5]${C_RESET} ${C_RED}Uninstall${C_RESET}\n"
+                        printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
+                        read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
+                        
+                        case "$bp_choice" in
+                            1) reinstall_blueprint; pause ;;
+                            2) update_blueprint; pause ;;
+                            3) blueprint_info; pause ;;
+                            4) printf '\nBlueprint version: %s\nPanel version: %s\n' "$(blueprint_version)" "$(panel_version)"; pause ;;
+                            5) uninstall_blueprint; pause ;;
+                            0) break ;;
+                            *) warn "Invalid option."; sleep 1 ;;
+                        esac
+                    else
+                        printf " ${C_CYAN}Status :${C_RESET} ${C_RED}● OFFLINE${C_RESET}\n\n"
+                        printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Install${C_RESET}\n"
+                        printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
+                        read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
+                        
+                        case "$bp_choice" in
+                            1) install_blueprint; pause ;;
+                            0) break ;;
+                            *) warn "Invalid option."; sleep 1 ;;
+                        esac
+                    fi
+                done
+                ;;
             2) clear; printf "  ${C_CYAN}--- Theme Management ---${C_RESET}\n\n"; warn "Theme manager coming soon."; pause ;;
             3) clear; printf "  ${C_CYAN}--- Extensions ---${C_RESET}\n\n"; warn "Extensions manager coming soon."; pause ;;
             0) return ;;
@@ -94,10 +210,7 @@ playtely_theme_menu() {
 }
 
 # ---------- System Stats ----------
-get_cpu_usage() {
-    local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
-    printf "%.0f" "${cpu:-0}"
-}
+get_cpu_usage() { local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}'); printf "%.0f" "${cpu:-0}"; }
 get_ram_usage() { free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' || echo "0"; }
 get_network_status() { if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}● CONNECTED${C_RESET}"; else printf "${C_RED}● DISCONNECTED${C_RESET}"; fi; }
 get_uptime() { uptime -p 2>/dev/null | sed 's/up //; s/ weeks/ weeks,/; s/ days/ days,/' || echo "Unknown"; }
@@ -105,22 +218,11 @@ get_disk_usage() { df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"; }
 get_current_user() { echo "${USER:-root}"; }
 
 # ---------- UI ----------
-center_line() {
-    local text="$1"; local cols=$(tput cols 2>/dev/null || echo 80)
-    local clean_text=$(printf "%s" "$text" | sed 's/\x1b\[[0-9;]*m//g')
-    local len=${#clean_text}; local padding=$(( (cols - len) / 2 ))
-    [[ "$padding" -lt 0 ]] && padding=0
-    printf "%${padding}s%s\n" "" "$text"
-}
+center_line() { local text="$1"; local cols=$(tput cols 2>/dev/null || echo 80); local clean_text=$(printf "%s" "$text" | sed 's/\x1b\[[0-9;]*m//g'); local len=${#clean_text}; local padding=$(( (cols - len) / 2 )); [[ "$padding" -lt 0 ]] && padding=0; printf "%${padding}s%s\n" "" "$text"; }
 
 draw_top_bar() {
-    local user=$(get_current_user); local up=$(get_uptime); local disk=$(get_disk_usage)
-    local ram=$(get_ram_usage); local cpu=$(get_cpu_usage)
-    local p1="${C_BG_BLUE}${C_WHITE}  ${user} ${C_RESET}"
-    local p2="${C_BG_PURPLE}${C_WHITE}  ${up} ${C_RESET}"
-    local p3="${C_BG_GREEN}${C_WHITE}  ${disk} ${C_RESET}"
-    local p4="${C_BG_RED}${C_WHITE}  RAM ${ram}% ${C_RESET}"
-    local p5="${C_BG_GREEN}${C_WHITE} CPU ${cpu}% ${C_RESET}"
+    local user=$(get_current_user); local up=$(get_uptime); local disk=$(get_disk_usage); local ram=$(get_ram_usage); local cpu=$(get_cpu_usage)
+    local p1="${C_BG_BLUE}${C_WHITE}  ${user} ${C_RESET}"; local p2="${C_BG_PURPLE}${C_WHITE}  ${up} ${C_RESET}"; local p3="${C_BG_GREEN}${C_WHITE}  ${disk} ${C_RESET}"; local p4="${C_BG_RED}${C_WHITE}  RAM ${ram}% ${C_RESET}"; local p5="${C_BG_GREEN}${C_WHITE} CPU ${cpu}% ${C_RESET}"
     printf "  %s  %s  %s  %s  %s\n" "$p1" "$p2" "$p3" "$p4" "$p5"
 }
 
@@ -146,23 +248,16 @@ draw_ui() {
     local cols=$(tput cols 2>/dev/null || echo 80)
     printf "${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 $cols))"
     show_logo
-
     printf " ${C_WHITE}●${C_RESET} ${C_BOLD}SYSTEM STATUS${C_RESET}\n"
     printf "   ${C_DIM}CPU Usage:${C_RESET} ${C_CYAN}%s%%${C_RESET}     " "$(get_cpu_usage)"
     printf "${C_DIM}RAM Usage:${C_RESET} ${C_CYAN}%s%%${C_RESET}     " "$(get_ram_usage)"
     printf "${C_DIM}Network:${C_RESET} %s\n\n" "$(get_network_status)"
-
     printf " ${C_CYAN}::${C_RESET} ${C_BOLD}DEPLOYMENT & SERVICES${C_RESET}\n"
-    printf "  ├── ${C_WHITE}[${C_YELLOW}1${C_WHITE}]${C_RESET} %-20s  " "Panel"
-    printf "├── ${C_WHITE}[${C_YELLOW}5${C_WHITE}]${C_RESET} %-20s\n" "System"
-    printf "  ├── ${C_WHITE}[${C_YELLOW}2${C_WHITE}]${C_RESET} %-20s  " "Wings"
-    printf "├── ${C_WHITE}[${C_YELLOW}6${C_WHITE}]${C_RESET} %-20s\n" "Container"
-    printf "  ├── ${C_WHITE}[${C_YELLOW}3${C_WHITE}]${C_RESET} %-20s  " "Toolbox"
-    printf "├── ${C_WHITE}[${C_YELLOW}7${C_WHITE}]${C_RESET} %-20s\n" "Backup"
-    printf "  └── ${C_WHITE}[${C_YELLOW}4${C_WHITE}]${C_RESET} %-20s  " "Theme"
-    printf "└── ${C_WHITE}[${C_YELLOW}8${C_WHITE}]${C_RESET} %-20s\n" "About"
+    printf "  ├── ${C_WHITE}[${C_YELLOW}1${C_WHITE}]${C_RESET} %-20s  " "Panel"; printf "├── ${C_WHITE}[${C_YELLOW}5${C_WHITE}]${C_RESET} %-20s\n" "System"
+    printf "  ├── ${C_WHITE}[${C_YELLOW}2${C_WHITE}]${C_RESET} %-20s  " "Wings"; printf "├── ${C_WHITE}[${C_YELLOW}6${C_WHITE}]${C_RESET} %-20s\n" "Container"
+    printf "  ├── ${C_WHITE}[${C_YELLOW}3${C_WHITE}]${C_RESET} %-20s  " "Toolbox"; printf "├── ${C_WHITE}[${C_YELLOW}7${C_WHITE}]${C_RESET} %-20s\n" "Backup"
+    printf "  └── ${C_WHITE}[${C_YELLOW}4${C_WHITE}]${C_RESET} %-20s  " "Theme"; printf "└── ${C_WHITE}[${C_YELLOW}8${C_WHITE}]${C_RESET} %-20s\n" "About"
     echo ""
-    
     printf " ${C_PURPLE}::${C_RESET} ${C_BOLD}MAINTENANCE & TOOLS${C_RESET}\n"
     printf "  ├── ${C_WHITE}[${C_YELLOW}9${C_WHITE}]${C_RESET} %-30s " "New Models (Custom)"
     printf "${C_RED}[${C_BOLD}0${C_RESET}${C_RED}] SHUTDOWN SYSTEM${C_RESET}\n"
@@ -182,9 +277,6 @@ menu_help() { clear; printf "${C_CYAN}=== HELP ===${C_RESET}\n\n1. Panel: Instal
 system_check() { echo "=== SYSTEM CHECK ==="; printf 'Root: %s\nPanel: %s\nBlueprint: %s\nNode: %s\n' "$([[ $EUID -eq 0 ]] && echo YES || echo NO)" "$PANEL_DIR" "$(detect_blueprint && echo YES || echo NO)" "$(node --version 2>/dev/null || echo Missing)"; }
 view_logs() { if [ -f "$LOG_FILE" ]; then tail -n 20 "$LOG_FILE"; else warn "No logs found."; fi; }
 
-# ==========================================
-# MAIN LOOP
-# ==========================================
 main_menu() {
     load_modules || exit 1
     while true; do
@@ -194,10 +286,7 @@ main_menu() {
             1) menu_panel ;;
             2) menu_wings ;;
             3) menu_toolbox ;;
-            4) 
-                # Yahan Theme menu direct call ho raha hai
-                playtely_theme_menu 
-                ;;
+            4) playtely_theme_menu ;;
             5) menu_system ;;
             6) menu_container ;;
             7) menu_backup ;;
