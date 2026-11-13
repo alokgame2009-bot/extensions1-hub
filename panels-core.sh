@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 # panels-core.sh - Pterodactyl Panel Manager UI
 
+# Fallback Colors (Agar main file mein na ho toh bhi kaam kare)
+C_PINK="${C_PINK:-$'\033[38;5;213m'}"
+C_RESET="${C_RESET:-$'\033[0m'}"
+C_BOLD="${C_BOLD:-$'\033[1m'}"
+C_DIM="${C_DIM:-$'\033[2m'}"
+C_CYAN="${C_CYAN:-$'\033[38;5;45m'}"
+C_BLUE="${C_BLUE:-$'\033[38;5;39m'}"
+C_GREEN="${C_GREEN:-$'\033[38;5;82m'}"
+C_YELLOW="${C_YELLOW:-$'\033[38;5;220m'}"
+C_RED="${C_RED:-$'\033[38;5;203m'}"
+C_WHITE="${C_WHITE:-$'\033[97m'}"
+C_GRAY="${C_GRAY:-$'\033[38;5;240m'}"
+
 menu_panel() {
     while true; do
         clear 2>/dev/null || true
@@ -56,11 +69,8 @@ playtely_panel_menu() {
     while true; do
         clear 2>/dev/null || true
         
-        # Define fallback for C_PINK if not set in main environment
-        local CP=${C_PINK:-$C_CYAN}
-        
         # Pink Logo
-        printf "${CP}"
+        printf "${C_PINK}"
         cat << 'EOF'
 ██████╗ ██╗      █████╗ ██╗   ██╗████████╗███████╗██╗  ██╗   ██╗
 ██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔════╝██║  ██║   ██║
