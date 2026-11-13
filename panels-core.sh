@@ -49,12 +49,24 @@ menu_panel() {
     done
 }
 
+# ==========================================
+# BLUEPRINT SUB-MENU (Inside Option 1)
+# ==========================================
 blueprint_submenu() {
     clear
-    printf "${C_CYAN}--- Pterodactyl v1 (Blueprint Manager) ---${C_RESET}\n\n"
+    printf "${C_CYAN}--- Pterodactyl v1 Panel Manager (Blueprint) ---${C_RESET}\n\n"
     if detect_blueprint; then
-        printf " ${C_GREEN}● Status: ONLINE${C_RESET} (v%s)\n\n" "$(blueprint_version)"
-        printf "1. Reinstall Blueprint\n2. Update Blueprint\n3. Panel Info\n4. Uninstall Blueprint\n0. Back\n\n"
+        local b_ver=$(blueprint_version)
+        if [[ "$b_ver" == "Unknown" ]]; then
+            printf " ${C_GREEN}● Status: ONLINE${C_RESET}\n\n"
+        else
+            printf " ${C_GREEN}● Status: ONLINE${C_RESET} (v%s)\n\n" "$b_ver"
+        fi
+        printf "1. Reinstall Blueprint\n"
+        printf "2. Update Blueprint\n"
+        printf "3. Panel Info\n"
+        printf "4. Uninstall Blueprint\n"
+        printf "0. Back\n\n"
         read -r -p "Select: " sub_ch
         case "$sub_ch" in
             1) reinstall_blueprint; pause ;;
@@ -64,7 +76,8 @@ blueprint_submenu() {
         esac
     else
         printf " ${C_RED}● Status: OFFLINE${C_RESET}\n\n"
-        printf "1. Install Pterodactyl v1 (Blueprint)\n0. Back\n\n"
+        printf "1. Install Pterodactyl v1 (Blueprint)\n"
+        printf "0. Back\n\n"
         read -r -p "Select: " sub_ch
         case "$sub_ch" in
             1) install_blueprint; pause ;;
