@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v6.0 - Main UI & Router (Real Blueprint Integration)
+# Extension Hub v6.5 - Main UI & Router (Fixed Blueprint)
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v6.0"
+APP_VERSION="v6.5"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -42,34 +42,15 @@ need_root() { [[ "$EUID" -eq 0 ]] || { err "Run as root."; return 1; }; }
 valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/composer.json" ]]; }
 detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]]; }
 blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
+panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
-# ---------- Load Core Modules ----------
-load_modules() {
-    local module
-    for module in "blueprint-core.sh" "panels-core.sh"; do
-        local local_file="/opt/extension-hub/$module"
-        if [[ ! -f "$local_file" ]]; then
-            if ! curl -fsSL --retry 3 "$BASE_URL/$module" -o "/tmp/$module.tmp"; then
-                err "Failed to load $module from GitHub."
-                return 1
-            fi
-            local_file="/tmp/$module.tmp"
-        fi
-        source "$local_file"
-        rm -f "/tmp/$module.tmp"
-    done
-}
-
-# ==========================================
-# REAL BLUEPRINT FUNCTIONS
-# ==========================================
+# ---------- REAL BLUEPRINT FUNCTIONS ----------
 install_blueprint() {
   need_root || return 1
   if detect_blueprint; then warn "Blueprint already installed."; return 1; fi
   echo; warn "This installs Blueprint into: $PANEL_DIR"
   read -r -p "Continue? [y/N]: " answer; [[ "$answer" =~ ^[Yy]$ ]] || return 0
   
-  # Real installation steps
   info "Installing dependencies..."
   apt-get update
   DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git unzip wget zip
@@ -131,7 +112,7 @@ blueprint_info() {
 }
 
 # ==========================================
-# THEME MENU & BLUEPRINT SUB-MENU
+# THEME MENU (Embedded Directly)
 # ==========================================
 playtely_theme_menu() {
     while true; do
@@ -159,7 +140,7 @@ playtely_theme_menu() {
         
         case "$t_choice" in
             1) 
-                # BLUEPRINT SUB-MENU (Screenshot 1 & 2 Logic)
+                # BLUEPRINT SUB-MENU
                 while true; do
                     clear 2>/dev/null || true
                     printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
@@ -278,7 +259,6 @@ system_check() { echo "=== SYSTEM CHECK ==="; printf 'Root: %s\nPanel: %s\nBluep
 view_logs() { if [ -f "$LOG_FILE" ]; then tail -n 20 "$LOG_FILE"; else warn "No logs found."; fi; }
 
 main_menu() {
-    load_modules || exit 1
     while true; do
         draw_ui
         read -r -p " ➔ Enter Option (0-10): " choice || exit 0
