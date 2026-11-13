@@ -267,16 +267,21 @@ blueprint_menu() {
 }
 
 
+
 center_line() {
-    local text="$1"
-    local cols pad
+  local text="$1"
+  local cols pad len
 
-    cols=$(tput cols 2>/dev/null || echo 100)
-    pad=$(( (cols - ${#text}) / 2 ))
+  cols=$(tput cols 2>/dev/null || echo 100)
 
-    (( pad < 0 )) && pad=0
+  # Count UTF-8 characters, not bytes
+  len=$(printf '%s' "$text" | LC_ALL=C.UTF-8 wc -m)
+  len=${len//[[:space:]]/}
 
-    printf '%*s%s\n' "$pad" '' "$text"
+  pad=$(( (cols - len) / 2 ))
+  (( pad < 0 )) && pad=0
+
+  printf '%*s%s\n' "$pad" '' "$text"
 }
 
 # EXTENSION HUB LOGO
