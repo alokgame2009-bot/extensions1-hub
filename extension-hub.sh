@@ -292,8 +292,8 @@ main_menu() {
     clear 2>/dev/null || true
     show_logo
     echo
-    printf '%s%s%s\n' "$C_BOLD$C_CYAN"       "PTERODACTYL EXTENSION MANAGER" "$C_RESET"
-    echo     "Manage • Customize • Extend"
+        printf '%s%s%s\n' "$C_BOLD$C_CYAN"       "PTERODACTYL EXTENSION MANAGER" "$C_RESET"
+                                            echo     "Manage • Customize • Extend"
     echo
     echo "┌──────────────────────────────────┐"
     printf "│  Version       : %-16s│\n" "$APP_VERSION"
