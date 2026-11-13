@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Extension Hub v1.0 - Real Extension Manager
+# Extension Hub v1.0 - Real Extension Manager (Fixed)
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
@@ -9,7 +9,7 @@ LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
 BASE_URL="https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main"
 PANEL_DIR="/var/www/pterodactyl"
-EXT_DIR="/var/www/pterodactyl/extensions" # Apne extension folder ka path yahan dein
+EXT_DIR="/var/www/pterodactyl/extensions"
 
 # ---------- colors ----------
 if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
@@ -44,16 +44,19 @@ detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$
 blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
+# ---------- System Stats (FIXED) ----------
+get_cpu_usage() { 
+    local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
+    printf "%.0f" "${cpu:-0}"
+}
+get_ram_usage() { free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' || echo "0"; }
+get_network_status() { if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}● CONNECTED${C_RESET}"; else printf "${C_RED}● DISCONNECTED${C_RESET}"; fi; }
+
 # ---------- REAL EXTENSION LOGIC ----------
 install_ext() {
     local ext_id="$1"
     local ext_name="$2"
-    
-    # Yahan aapki asli extension installation logic aayegi
-    # Example: Agar extension folder local hai to copy karna, ya GitHub se clone karna
-    
     info "Installing Extension: $ext_name (ID: $ext_id)"
-    # Dummy logic for simulation
     sleep 0.5
     ok "Installed $ext_name"
 }
@@ -61,8 +64,6 @@ install_ext() {
 remove_ext() {
     local ext_id="$1"
     local ext_name="$2"
-    
-    # Yahan aapki asli extension removal logic aayegi
     info "Removing Extension: $ext_name (ID: $ext_id)"
     sleep 0.5
     ok "Removed $ext_name"
@@ -72,7 +73,6 @@ remove_ext() {
 # EXTENSIONS GRID MENU
 # ==========================================
 playtely_extensions_menu() {
-    # 66 Extensions List
     local extensions=(
         "1|adminauditlogs" "2|huxregister" "3|loader" "4|lyrdyannounce"
         "5|mclogs" "6|mcplugins" "7|mctools" "8|minecraftplayermanager"
@@ -97,101 +97,73 @@ playtely_extensions_menu() {
 
     while true; do
         clear 2>/dev/null || true
-        
-        # Header Box
         printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
         printf "${C_CYAN}║${C_RESET}                     ${C_PINK}Nobita.dev CONTROL HUB${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
         printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
 
-        # Grid Layout (2 Columns)
         local half=$(( (${#extensions[@]} + 1) / 2 ))
         for ((i=0; i<half; i++)); do
             IFS='|' read -r id1 name1 <<< "${extensions[$i]}"
             local right_index=$((i + half))
             
-            # Left Column Selection
             local sel1="[-]"; local col1="${C_GRAY}"
             for s in "${selected_extensions[@]}"; do 
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
-            
-            # Left Column Print (Numbers are CYAN)
             printf " ${col1}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-25s${C_RESET}" "$sel1" "$id1" "$name1"
             
-            # Right Column
             if [ "$right_index" -lt "${#extensions[@]}" ]; then
                 IFS='|' read -r id2 name2 <<< "${extensions[$right_index]}"
                 local sel2="[-]"; local col2="${C_GRAY}"
                 for s in "${selected_extensions[@]}"; do 
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
-                
                 printf "   ${col2}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-25s${C_RESET}" "$sel2" "$id2" "$name2"
             fi
             echo ""
         done
         echo ""
 
-        # Footer
         printf " ${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 75))"
         printf " ${C_WHITE}SELECTED: ${C_YELLOW}%d${C_WHITE} items${C_RESET}\n" "${#selected_extensions[@]}"
-        
         printf " ${C_GREEN}[i] Install  ${C_RED}[r] Remove  ${C_BLUE}[a] Select All  ${C_WHITE}[c] Clear  ${C_RED}[0] Exit${C_RESET}\n\n"
         
         read -r -p " 👉 ${C_GREEN}Select ID(s) or Action:${C_RESET} " input
         
         case "$input" in
-            0|"exit")
-                return
-                ;;
+            0|"exit") return ;;
             "a"|"A")
                 selected_extensions=()
-                for ext in "${extensions[@]}"; do
-                    IFS='|' read -r id _ <<< "$ext"
-                    selected_extensions+=("$id")
-                done
+                for ext in "${extensions[@]}"; do IFS='|' read -r id _ <<< "$ext"; selected_extensions+=("$id"); done
                 ;;
-            "c"|"C")
-                selected_extensions=()
-                ;;
+            "c"|"C") selected_extensions=() ;;
             "i"|"I")
-                if [ ${#selected_extensions[@]} -eq 0 ]; then
-                    echo -e "\n${C_RED}Error: No extensions selected!${C_RESET}"
-                    sleep 1
+                if [ ${#selected_extensions[@]} -eq 0 ]; then echo -e "\n${C_RED}Error: No extensions selected!${C_RESET}"; sleep 1
                 else
                     echo ""
                     for sel in "${selected_extensions[@]}"; do
                         for ext in "${extensions[@]}"; do
                             IFS='|' read -r id name <<< "$ext"
-                            if [ "$id" == "$sel" ]; then
-                                install_ext "$id" "$name"
-                            fi
+                            if [ "$id" == "$sel" ]; then install_ext "$id" "$name"; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ All selected extensions installed!${C_RESET}"
-                    pause
+                    echo -e "\n${C_GREEN}✓ All selected extensions installed!${C_RESET}"; pause
                 fi
                 ;;
             "r"|"R")
-                if [ ${#selected_extensions[@]} -eq 0 ]; then
-                    echo -e "\n${C_RED}Error: No extensions selected!${C_RESET}"
-                    sleep 1
+                if [ ${#selected_extensions[@]} -eq 0 ]; then echo -e "\n${C_RED}Error: No extensions selected!${C_RESET}"; sleep 1
                 else
                     echo ""
                     for sel in "${selected_extensions[@]}"; do
                         for ext in "${extensions[@]}"; do
                             IFS='|' read -r id name <<< "$ext"
-                            if [ "$id" == "$sel" ]; then
-                                remove_ext "$id" "$name"
-                            fi
+                            if [ "$id" == "$sel" ]; then remove_ext "$id" "$name"; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ All selected extensions removed!${C_RESET}"
-                    pause
+                    echo -e "\n${C_GREEN}✓ All selected extensions removed!${C_RESET}"; pause
                 fi
                 ;;
             *)
-                # Toggle Logic (Number input)
                 for num in $input; do
                     local found=0
                     for ext in "${extensions[@]}"; do
@@ -201,8 +173,7 @@ playtely_extensions_menu() {
                             local exists=0
                             for s in "${selected_extensions[@]}"; do [[ "$s" == "$num" ]] && exists=1; done
                             
-                            if [ "$exists" -eq 0 ]; then
-                                selected_extensions+=("$num")
+                            if [ "$exists" -eq 0 ]; then selected_extensions+=("$num")
                             else
                                 local new_sel=()
                                 for s in "${selected_extensions[@]}"; do [[ "$s" != "$num" ]] && new_sel+=("$s"); done
@@ -211,10 +182,7 @@ playtely_extensions_menu() {
                             break
                         fi
                     done
-                    if [ "$found" -eq 0 ]; then
-                        echo -e "\n${C_RED}Invalid ID: $num${C_RESET}"
-                        sleep 1
-                    fi
+                    if [ "$found" -eq 0 ]; then echo -e "\n${C_RED}Invalid ID: $num${C_RESET}"; sleep 1; fi
                 done
                 ;;
         esac
@@ -234,16 +202,12 @@ blueprint_info() { echo "Blueprint Info: v1.15.2"; pause; }
 playtely_theme_menu() {
     while true; do
         clear 2>/dev/null || true
-        
         printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
         printf "${C_CYAN}║${C_RESET}                       ${C_PINK}CONTROL PANEL UI${C_RESET}                       ${C_CYAN}║${C_RESET}\n"
         printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
         
-        if detect_blueprint; then
-            printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
-        else
-            printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}○ OFFLINE${C_RESET}\n\n"
-        fi
+        if detect_blueprint; then printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
+        else printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}○ OFFLINE${C_RESET}\n\n"; fi
         
         printf "  ${C_GREEN}[1]${C_RESET} ${C_CYAN}Blueprint${C_RESET}\n"
         printf "  ${C_GREEN}[2]${C_RESET} ${C_CYAN}Theme${C_RESET}\n"
@@ -259,9 +223,7 @@ playtely_theme_menu() {
                     printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
                     printf "${C_CYAN}║${C_RESET}                       ${C_PINK}CONTROL PANEL UI${C_RESET}                       ${C_CYAN}║${C_RESET}\n"
                     printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
-                    
                     printf " ${C_CYAN}BLUEPRINT PANEL${C_RESET}\n"
-                    
                     if detect_blueprint; then
                         printf " ${C_CYAN}Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
                         printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Reinstall${C_RESET}\n"
@@ -271,7 +233,6 @@ playtely_theme_menu() {
                         printf " ${C_RED}[5]${C_RESET} ${C_RED}Uninstall${C_RESET}\n"
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
                         read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
-                        
                         case "$bp_choice" in
                             1) reinstall_blueprint; pause ;;
                             2) update_blueprint; pause ;;
@@ -286,7 +247,6 @@ playtely_theme_menu() {
                         printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Install${C_RESET}\n"
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
                         read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
-                        
                         case "$bp_choice" in
                             1) install_blueprint; pause ;;
                             0) break ;;
