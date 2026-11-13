@@ -100,7 +100,7 @@ EOF
   echo "           PREMIUM PTERODACTYL INSTALLER"
   echo "────────────────────────────────────────────────────────────"
 
-  read -r -p "  • Panel Domain [panel.nobita.indevs.in] " DOMAIN
+  read -r -p "  • Panel Domain [panel.nexyoncloud.indevs.in] " DOMAIN
   DOMAIN="${DOMAIN:-panel.nobita.indevs.in}"
   valid_domain "$DOMAIN" || die "Invalid domain."
 
