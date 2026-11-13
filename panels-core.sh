@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# panels-core.sh - Server Panel Manager UI
+# panels-core.sh - Pterodactyl Panel Manager UI
 
 menu_panel() {
     while true; do
@@ -36,7 +36,7 @@ menu_panel() {
         read -r -p " λ Select Module [1-11]: " choice || return
         
         case "$choice" in
-            1) blueprint_submenu ;;
+            1) playtely_panel_menu ;;
             2|3|4|5) clear; printf "${C_YELLOW}--- Coming Soon ---${C_RESET}\n\n"; warn "Not implemented."; pause ;;
             6) clear; printf "${C_PURPLE}--- Paymenter ---${C_RESET}\n\n"; warn "Coming soon."; pause ;;
             7) clear; printf "${C_CYAN}--- Pterodactyl v2 ---${C_RESET}\n\n"; warn "Coming soon."; pause ;;
@@ -50,37 +50,83 @@ menu_panel() {
 }
 
 # ==========================================
-# BLUEPRINT SUB-MENU (Inside Option 1)
+# PLAYETY STYLE PANEL MENU (Inside Option 1)
 # ==========================================
-blueprint_submenu() {
-    clear
-    printf "${C_CYAN}--- Pterodactyl v1 Panel Manager (Blueprint) ---${C_RESET}\n\n"
-    if detect_blueprint; then
-        local b_ver=$(blueprint_version)
-        if [[ "$b_ver" == "Unknown" ]]; then
-            printf " ${C_GREEN}● Status: ONLINE${C_RESET}\n\n"
+playtely_panel_menu() {
+    while true; do
+        clear 2>/dev/null || true
+        
+        # Pink Logo
+        printf "${C_PINK}"
+        cat << 'EOF'
+██████╗ ██╗      █████╗ ██╗   ██╗████████╗███████╗██╗  ██╗   ██╗
+██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔════╝██║  ██║   ██║
+██████╔╝██║     ███████║ ╚████╔╝    ██║   █████╗  ███████║   ██║
+██╔═══╝ ██║     ██╔══██║  ╚██╔╝     ██║   ██╔══╝  ██╔══██║   ██║
+██║     ███████╗██║  ██║   ██║      ██║   ███████╗██║  ██║   ██║
+╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝   ╚═╝
+EOF
+        printf "${C_RESET}\n"
+
+        # Status Box
+        if detect_blueprint; then
+            local b_ver=$(blueprint_version)
+            if [[ "$b_ver" == "Unknown" || -z "$b_ver" ]]; then
+                printf "${C_BLUE}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
+                printf "${C_BLUE}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET}                           ${C_BLUE}│${C_RESET}\n"
+                printf "${C_BLUE}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
+            else
+                printf "${C_BLUE}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
+                printf "${C_BLUE}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET} ${C_DIM}(v%s)${C_RESET}                   ${C_BLUE}│${C_RESET}\n" "$b_ver"
+                printf "${C_BLUE}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
+            fi
         else
-            printf " ${C_GREEN}● Status: ONLINE${C_RESET} (v%s)\n\n" "$b_ver"
+            printf "${C_BLUE}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
+            printf "${C_BLUE}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_RED}NOT INSTALLED${C_RESET} ${C_RED}✗${C_RESET}                       ${C_BLUE}│${C_RESET}\n"
+            printf "${C_BLUE}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
         fi
-        printf "1. Reinstall Blueprint\n"
-        printf "2. Update Blueprint\n"
-        printf "3. Panel Info\n"
-        printf "4. Uninstall Blueprint\n"
-        printf "0. Back\n\n"
-        read -r -p "Select: " sub_ch
-        case "$sub_ch" in
-            1) reinstall_blueprint; pause ;;
-            2) update_blueprint; pause ;;
-            3) blueprint_info; pause ;;
-            4) uninstall_blueprint; pause ;;
-        esac
-    else
-        printf " ${C_RED}● Status: OFFLINE${C_RESET}\n\n"
-        printf "1. Install Pterodactyl v1 (Blueprint)\n"
-        printf "0. Back\n\n"
-        read -r -p "Select: " sub_ch
-        case "$sub_ch" in
-            1) install_blueprint; pause ;;
-        esac
-    fi
+
+        # Action Box
+        printf "${C_BLUE}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
+        if detect_blueprint; then
+            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_WHITE}Reinstall${C_RESET}    ${C_DIM}:: (Fresh Setup)${C_RESET}                 ${C_BLUE}│${C_RESET}\n"
+            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[2]${C_RESET} ${C_WHITE}Update${C_RESET}       ${C_DIM}:: (Latest Release)${C_RESET}              ${C_BLUE}│${C_RESET}\n"
+            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[3]${C_RESET} ${C_WHITE}Panel Info${C_RESET}   ${C_DIM}:: (System Details)${C_RESET}              ${C_BLUE}│${C_RESET}\n"
+            printf "${C_BLUE}│${C_RESET}  ${C_RED}[4]${C_RESET} ${C_WHITE}Uninstall${C_RESET}    ${C_DIM}:: (Remove Data)${C_RESET}                 ${C_BLUE}│${C_RESET}\n"
+        else
+            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_WHITE}Install${C_RESET}      ${C_DIM}:: (Fresh Install)${C_RESET}               ${C_BLUE}│${C_RESET}\n"
+            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[2]${C_RESET} ${C_WHITE}User${C_RESET}         ${C_DIM}:: (Add Admin/User)${C_RESET}              ${C_BLUE}│${C_RESET}\n"
+            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[3]${C_RESET} ${C_WHITE}Update${C_RESET}       ${C_DIM}:: (Latest Release)${C_RESET}              ${C_BLUE}│${C_RESET}\n"
+            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[4]${C_RESET} ${C_WHITE}Domin${C_RESET}        ${C_DIM}:: (Change domain/ssl)${C_RESET}           ${C_BLUE}│${C_RESET}\n"
+            printf "${C_BLUE}│${C_RESET}  ${C_RED}[5]${C_RESET} ${C_WHITE}Uninstall${C_RESET}    ${C_DIM}:: (Remove Data)${C_RESET}                 ${C_BLUE}│${C_RESET}\n"
+            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[6]${C_RESET} ${C_WHITE}phpmyadmin${C_RESET}   ${C_DIM}:: (phpmyadmin Data)${C_RESET}             ${C_BLUE}│${C_RESET}\n"
+        fi
+        printf "${C_BLUE}├────────────────────────────────────────────────────────┤${C_RESET}\n"
+        printf "${C_BLUE}│${C_RESET}  ${C_RED}[0]${C_RESET} ${C_WHITE}Exit System${C_RESET}                                     ${C_BLUE}│${C_RESET}\n"
+        printf "${C_BLUE}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
+
+        read -r -p " λ Select Option: " p_choice || return
+        
+        if detect_blueprint; then
+            case "$p_choice" in
+                1) reinstall_blueprint; pause ;;
+                2) update_blueprint; pause ;;
+                3) blueprint_info; pause ;;
+                4) uninstall_blueprint; pause ;;
+                0) return ;;
+                *) warn "Invalid option."; sleep 1 ;;
+            esac
+        else
+            case "$p_choice" in
+                1) install_blueprint; pause ;;
+                2) clear; warn "User creation is not implemented yet."; pause ;;
+                3) clear; warn "Update requires panel to be installed first."; pause ;;
+                4) clear; warn "Domain/SSL management coming soon."; pause ;;
+                5) clear; warn "Nothing to uninstall."; pause ;;
+                6) clear; warn "phpmyadmin setup coming soon."; pause ;;
+                0) return ;;
+                *) warn "Invalid option."; sleep 1 ;;
+            esac
+        fi
+    done
 }
