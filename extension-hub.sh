@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Extension Hub v1.0 - Real Extension Manager (Fixed)
+# Extension Hub v1.0 - Fully Fixed
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
@@ -44,15 +44,26 @@ detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$
 blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
-# ---------- System Stats (FIXED) ----------
+# ==========================================
+# SYSTEM STATS FUNCTIONS (YAHAN FIX HAI)
+# ==========================================
 get_cpu_usage() { 
     local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
     printf "%.0f" "${cpu:-0}"
 }
-get_ram_usage() { free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' || echo "0"; }
-get_network_status() { if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}● CONNECTED${C_RESET}"; else printf "${C_RED}● DISCONNECTED${C_RESET}"; fi; }
+get_ram_usage() { 
+    free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' || echo "0"
+}
+get_network_status() { 
+    if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}● CONNECTED${C_RESET}"; else printf "${C_RED}● DISCONNECTED${C_RESET}"; fi
+}
+get_uptime() { uptime -p 2>/dev/null | sed 's/up //; s/ weeks/ weeks,/; s/ days/ days,/' || echo "Unknown"; }
+get_disk_usage() { df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"; }
+get_current_user() { echo "${USER:-root}"; }
 
-# ---------- REAL EXTENSION LOGIC ----------
+# ==========================================
+# REAL EXTENSION LOGIC
+# ==========================================
 install_ext() {
     local ext_id="$1"
     local ext_name="$2"
@@ -189,15 +200,8 @@ playtely_extensions_menu() {
     done
 }
 
-# ---------- REAL BLUEPRINT FUNCTIONS ----------
-install_blueprint() { info "Mock: Installing Blueprint..."; sleep 2; ok "Done."; }
-update_blueprint() { info "Mock: Updating Blueprint..."; sleep 2; ok "Done."; }
-reinstall_blueprint() { info "Mock: Reinstalling..."; sleep 2; ok "Done."; }
-uninstall_blueprint() { info "Mock: Uninstalling..."; sleep 2; ok "Done."; }
-blueprint_info() { echo "Blueprint Info: v1.15.2"; pause; }
-
 # ==========================================
-# THEME MENU (Embedded Directly)
+# THEME MENU
 # ==========================================
 playtely_theme_menu() {
     while true; do
@@ -234,11 +238,11 @@ playtely_theme_menu() {
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
                         read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
-                            1) reinstall_blueprint; pause ;;
-                            2) update_blueprint; pause ;;
-                            3) blueprint_info; pause ;;
+                            1) info "Mock Reinstall"; pause ;;
+                            2) info "Mock Update"; pause ;;
+                            3) echo "Blueprint Info"; pause ;;
                             4) printf '\nBlueprint version: %s\nPanel version: %s\n' "$(blueprint_version)" "$(panel_version)"; pause ;;
-                            5) uninstall_blueprint; pause ;;
+                            5) warn "Uninstall disabled"; pause ;;
                             0) break ;;
                             *) warn "Invalid option."; sleep 1 ;;
                         esac
@@ -248,7 +252,7 @@ playtely_theme_menu() {
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
                         read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
-                            1) install_blueprint; pause ;;
+                            1) info "Mock Install"; pause ;;
                             0) break ;;
                             *) warn "Invalid option."; sleep 1 ;;
                         esac
@@ -263,11 +267,13 @@ playtely_theme_menu() {
     done
 }
 
-# ---------- UI ----------
+# ==========================================
+# UI & DRAWING
+# ==========================================
 center_line() { local text="$1"; local cols=$(tput cols 2>/dev/null || echo 80); local clean_text=$(printf "%s" "$text" | sed 's/\x1b\[[0-9;]*m//g'); local len=${#clean_text}; local padding=$(( (cols - len) / 2 )); [[ "$padding" -lt 0 ]] && padding=0; printf "%${padding}s%s\n" "" "$text"; }
 
 draw_top_bar() {
-    local user=$(whoami); local up=$(uptime -p 2>/dev/null | sed 's/up //'); local disk=$(df -h / 2>/dev/null | awk 'NR==2 {print $5}'); local ram=$(free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}'); local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
+    local user=$(get_current_user); local up=$(get_uptime); local disk=$(get_disk_usage); local ram=$(get_ram_usage); local cpu=$(get_cpu_usage)
     local p1="${C_BG_BLUE}${C_WHITE}  ${user} ${C_RESET}"; local p2="${C_BG_PURPLE}${C_WHITE}  ${up} ${C_RESET}"; local p3="${C_BG_GREEN}${C_WHITE}  ${disk} ${C_RESET}"; local p4="${C_BG_RED}${C_WHITE}  RAM ${ram}% ${C_RESET}"; local p5="${C_BG_GREEN}${C_WHITE} CPU ${cpu}% ${C_RESET}"
     printf "  %s  %s  %s  %s  %s\n" "$p1" "$p2" "$p3" "$p4" "$p5"
 }
