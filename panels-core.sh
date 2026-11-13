@@ -36,10 +36,7 @@ menu_panel() {
         read -r -p " λ Select Module [1-11]: " choice || return
         
         case "$choice" in
-            1) 
-                # Blueprint Module call
-                blueprint_submenu
-                ;;
+            1) blueprint_submenu ;;
             2|3|4|5) clear; printf "${C_YELLOW}--- Coming Soon ---${C_RESET}\n\n"; warn "Not implemented."; pause ;;
             6) clear; printf "${C_PURPLE}--- Paymenter ---${C_RESET}\n\n"; warn "Coming soon."; pause ;;
             7) clear; printf "${C_CYAN}--- Pterodactyl v2 ---${C_RESET}\n\n"; warn "Coming soon."; pause ;;
@@ -52,19 +49,12 @@ menu_panel() {
     done
 }
 
-# ==========================================
-# BLUEPRINT SUB-MENU (Inside Option 1)
-# ==========================================
 blueprint_submenu() {
     clear
     printf "${C_CYAN}--- Pterodactyl v1 (Blueprint Manager) ---${C_RESET}\n\n"
     if detect_blueprint; then
         printf " ${C_GREEN}● Status: ONLINE${C_RESET} (v%s)\n\n" "$(blueprint_version)"
-        printf "1. Reinstall Blueprint\n"
-        printf "2. Update Blueprint\n"
-        printf "3. Panel Info\n"
-        printf "4. Uninstall Blueprint\n"
-        printf "0. Back\n\n"
+        printf "1. Reinstall Blueprint\n2. Update Blueprint\n3. Panel Info\n4. Uninstall Blueprint\n0. Back\n\n"
         read -r -p "Select: " sub_ch
         case "$sub_ch" in
             1) reinstall_blueprint; pause ;;
@@ -74,8 +64,7 @@ blueprint_submenu() {
         esac
     else
         printf " ${C_RED}● Status: OFFLINE${C_RESET}\n\n"
-        printf "1. Install Pterodactyl v1 (Blueprint)\n"
-        printf "0. Back\n\n"
+        printf "1. Install Pterodactyl v1 (Blueprint)\n0. Back\n\n"
         read -r -p "Select: " sub_ch
         case "$sub_ch" in
             1) install_blueprint; pause ;;
