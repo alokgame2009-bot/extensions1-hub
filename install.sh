@@ -23,7 +23,8 @@ apt-get install -y -qq bash coreutils grep sed >/dev/null 2>&1
 tmp_main="$(mktemp)"
 tmp_bp="$(mktemp)"
 tmp_panel="$(mktemp)"
-trap 'rm -f "$tmp_main" "$tmp_bp" "$tmp_panel"' EXIT
+tmp_nex="$(mktemp)"
+trap 'rm -f "$tmp_main" "$tmp_bp" "$tmp_panel" "$tmp_nex"' EXIT
 
 echo "==> Downloading Main UI..."
 if ! curl -fsSL --retry 3 "$REPO_RAW/extension-hub.sh" -o "$tmp_main"; then echo "Failed: extension-hub.sh"; exit 1; fi
@@ -34,10 +35,14 @@ if ! curl -fsSL --retry 3 "$REPO_RAW/blueprint-core.sh" -o "$tmp_bp"; then echo 
 echo "==> Downloading Panels Core..."
 if ! curl -fsSL --retry 3 "$REPO_RAW/panels-core.sh" -o "$tmp_panel"; then echo "Failed: panels-core.sh"; exit 1; fi
 
+echo "==> Downloading NexyonCloud Installer..."
+if ! curl -fsSL --retry 3 "$REPO_RAW/nexyoncloud-installer.sh" -o "$tmp_nex"; then echo "Failed: nexyoncloud-installer.sh"; exit 1; fi
+
 install -d -m 755 "$INSTALL_DIR"
 install -m 755 "$tmp_main" "$INSTALL_DIR/extension-hub.sh"
 install -m 755 "$tmp_bp" "$INSTALL_DIR/blueprint-core.sh"
 install -m 755 "$tmp_panel" "$INSTALL_DIR/panels-core.sh"
+install -m 755 "$tmp_nex" "$INSTALL_DIR/nexyoncloud-installer.sh"
 install -m 755 "$tmp_main" "$BIN_PATH"
 
 echo "==> Installation complete. Opening Extension Hub..."
