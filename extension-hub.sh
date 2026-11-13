@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v5.0 - Main UI & Router
+# Extension Hub v5.5 - Main UI & Router (Fully Embedded)
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v5.0"
+APP_VERSION="v5.5"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -16,11 +16,12 @@ if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
   C_GREEN=$'\033[38;5;82m'; C_YELLOW=$'\033[38;5;220m'
   C_RED=$'\033[38;5;203m'; C_WHITE=$'\033[97m'
   C_PURPLE=$'\033[38;5;135m'; C_GRAY=$'\033[38;5;240m'
+  C_PINK=$'\033[38;5;213m'
   C_BG_BLUE=$'\033[48;5;18m'; C_BG_PURPLE=$'\033[48;5;53m'
   C_BG_GREEN=$'\033[48;5;22m'; C_BG_RED=$'\033[48;5;52m'
 else
   C_RESET=""; C_BOLD=""; C_DIM=""; C_CYAN=""; C_BLUE=""
-  C_GREEN=""; C_YELLOW=""; C_RED=""; C_WHITE=""; C_PURPLE=""; C_GRAY=""
+  C_GREEN=""; C_YELLOW=""; C_RED=""; C_WHITE=""; C_PURPLE=""; C_GRAY=""; C_PINK=""
   C_BG_BLUE=""; C_BG_PURPLE=""; C_BG_GREEN=""; C_BG_RED=""
 fi
 
@@ -36,7 +37,7 @@ pause() { echo; read -r -p "Press Enter to continue..." _ || true; }
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
-# ---------- Load Core Modules ----------
+# ---------- Load Core Modules (Blueprint & Panels) ----------
 load_modules() {
     local module
     for module in "blueprint-core.sh" "panels-core.sh"; do
@@ -50,6 +51,60 @@ load_modules() {
         fi
         source "$local_file"
         rm -f "/tmp/$module.tmp"
+    done
+}
+
+# ==========================================
+# THEME MENU (Embedded Here)
+# ==========================================
+playtely_theme_menu() {
+    while true; do
+        clear 2>/dev/null || true
+        
+        # Top Box (Cyan Border, Pink Text)
+        printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
+        printf "${C_CYAN}║${C_RESET}                       ${C_PINK}CONTROL PANEL UI${C_RESET}                       ${C_CYAN}║${C_RESET}\n"
+        printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+        
+        # Status
+        if [[ -d "/var/www/pterodactyl" && -f "/var/www/pterodactyl/artisan" ]]; then
+            printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
+        else
+            printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}○ OFFLINE${C_RESET}\n\n"
+        fi
+        
+        # Menu Options (Green numbers, Blue text)
+        printf "  ${C_GREEN}[1]${C_RESET} ${C_CYAN}Blueprint${C_RESET}\n"
+        printf "  ${C_GREEN}[2]${C_RESET} ${C_CYAN}Theme${C_RESET}\n"
+        printf "  ${C_GREEN}[3]${C_RESET} ${C_CYAN}Extensions${C_RESET}\n\n"
+        
+        printf "  ${C_RED}[0]${C_RESET} ${C_RED}Exit${C_RESET}\n\n"
+        
+        # Prompt
+        read -r -p " ${C_GREEN}▶ Select Option :${C_RESET} " t_choice || return
+        
+        case "$t_choice" in
+            1) 
+                clear
+                printf "  ${C_CYAN}--- Blueprint Management ---${C_RESET}\n\n"
+                warn "Blueprint installation is handled from Panel -> [1] Pterodactyl v1 -> [1] Install."
+                pause 
+                ;;
+            2) 
+                clear
+                printf "  ${C_CYAN}--- Theme Management ---${C_RESET}\n\n"
+                warn "Theme manager coming soon."
+                pause 
+                ;;
+            3) 
+                clear
+                printf "  ${C_CYAN}--- Extensions ---${C_RESET}\n\n"
+                warn "Extensions manager coming soon."
+                pause 
+                ;;
+            0) return ;;
+            *) warn "Invalid option."; sleep 1 ;;
+        esac
     done
 }
 
@@ -133,7 +188,6 @@ draw_ui() {
 
 menu_wings() { clear; printf "${C_CYAN}=== WINGS NODE MANAGER ===${C_RESET}\n\n"; warn "Wings management is not implemented yet."; pause; }
 menu_toolbox() { clear; printf "${C_CYAN}=== TOOLBOX ===${C_RESET}\n\n1. System Check\n2. View Logs\n0. Back\n\n"; read -r -p "Select: " ch; case "$ch" in 1) system_check; pause;; 2) view_logs; pause;; esac; }
-menu_theme() { clear; printf "${C_CYAN}=== THEMES ===${C_RESET}\n\n"; warn "Theme manager coming soon."; pause; }
 menu_system() { clear; printf "${C_CYAN}=== SYSTEM INFO ===${C_RESET}\n\nOS: %s\nUptime: %s\nMemory: %s\nDisk: %s\n" "$(uname -sr)" "$(uptime -p)" "$(free -h | awk '/Mem:/ {print $3 " / " $2}')" "$(df -h / | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}')"; pause; }
 menu_container() { clear; printf "${C_CYAN}=== CONTAINERS ===${C_RESET}\n\n"; if command_exists docker; then docker ps --format "table {{.Names}}\t{{.Status}}"; else warn "Docker not installed."; fi; pause; }
 menu_backup() { clear; printf "${C_CYAN}=== BACKUP MANAGER ===${C_RESET}\n\n"; ls -lh "$BACKUP_DIR" 2>/dev/null || warn "No backups found."; echo; read -r -p "Create new backup? [y/N]: " ans; [[ "$ans" =~ ^[Yy]$ ]] && { need_root && make_backup && ok "Done."; }; pause; }
@@ -155,7 +209,7 @@ main_menu() {
             1) menu_panel ;;
             2) menu_wings ;;
             3) menu_toolbox ;;
-            4) menu_theme ;;
+            4) playtely_theme_menu ;; # <--- Yahan Theme Menu Call Ho Raha Hai
             5) menu_system ;;
             6) menu_container ;;
             7) menu_backup ;;
