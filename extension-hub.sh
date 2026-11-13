@@ -265,44 +265,70 @@ blueprint_menu() {
     fi
   done
 }
+
 placeholder_menu() {
   local title="$1"
   clear 2>/dev/null || true
+  printf '\033[1;94m'
   echo "╔══════════════════════════════════╗"
   printf '║ %-32s ║\n' "$title"
   echo "╚══════════════════════════════════╝"
+  printf '\033[0m'
   echo
   warn "This section is not implemented yet; no fake install actions are shown."
   pause
 }
+
 show_logo() {
-  printf '%s' "$C_CYAN"
+  printf '\033[1;94m'
   cat <<'LOGO'
-________   _________ ______ _   _ _______ _____ ____  _   _   _    _ _    _ ____
- |  ____\ \ / /__   __|  ____| \ | |__   __|_   _/ __ \| \ | | | |  | | |  | |  _ \
- | |__   \ V /   | |  | |__  |  \| |  | |    | || |  | |  \| | | |__| | |  | | |_) |
- |  __|   > <    | |  |  __| | . ` |  | |    | || |  | | . ` | |  __  | |  | |  _ <
- | |____ / . \   | |  | |____| |\  |  | |   _| || |__| | |\  | | |  | | |__| | |_) |
- |______/_/ \_\  |_|  |______|_| \_|  |_|  |_____\____/|_| \_| |_|  |_|\____/|____/
+███████╗██╗  ██╗████████╗███████╗███╗   ██╗███████╗██╗ ██████╗ ███╗   ██╗  ██╗  ██╗██╗   ██╗██████╗
+██╔════╝╚██╗██╔╝╚══██╔══╝██╔════╝████╗  ██║██╔════╝██║██╔═══██╗████╗  ██║  ██║  ██║██║   ██║██╔══██╗
+█████╗   ╚███╔╝    ██║   █████╗  ██╔██╗ ██║███████╗██║██║   ██║██╔██╗ ██║  ███████║██║   ██║██████╔╝
+██╔══╝   ██╔██╗    ██║   ██╔══╝  ██║╚██╗██║╚════██║██║██║   ██║██║╚██╗██║  ██╔══██║██║   ██║██╔══██╗
+███████╗██╔╝ ██╗   ██║   ███████╗██║ ╚████║███████║██║╚██████╔╝██║ ╚████║  ██║  ██║╚██████╔╝██████╔╝
+╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
 LOGO
-  printf '%s' "$C_RESET"
+  printf '\033[1;96m'
+  echo "              E X T E N S I O N   H U B"
+  printf '\033[0m'
 }
+
 main_menu() {
   while true; do
     clear 2>/dev/null || true
+
     show_logo
     echo
-        printf '%s%s%s\n' "$C_BOLD$C_CYAN"       "PTERODACTYL EXTENSION MANAGER" "$C_RESET"
-                                            echo     "Manage • Customize • Extend"
+
+    printf '\033[1;96m'
+    echo "       PTERODACTYL EXTENSION MANAGER"
+    printf '\033[0m'
+
+    printf '\033[1;94m'
+    echo "          Manage • Customize • Extend"
+    printf '\033[0m'
+
     echo
-    echo "┌──────────────────────────────────┐"
-    printf "│  Version       : %-16s│\n" "$APP_VERSION"
-    printf "│  Made by       : %-16s│\n" "$AUTHOR"
-    printf "│  Panel Version : %-16s│\n" "1.x.x"
-    echo "└──────────────────────────────────┘"
+    printf '\033[1;94m'
+    echo "  ╔══════════════════════════════════╗"
+    printf '\033[1;97m'
+    printf "  ║  Version       : %-16s║\n" "$APP_VERSION"
+    printf "  ║  Made by       : %-16s║\n" "$AUTHOR"
+    printf "  ║  Panel Version : %-16s║\n" "1.x.x"
+    printf '\033[1;94m'
+    echo "  ╚══════════════════════════════════╝"
+    printf '\033[0m'
+
     echo
-    echo "© 2026 Extension Hub • All Rights Reserved"
+    printf '\033[1;90m'
+    echo "       © 2026 Extension Hub"
+    echo "          All Rights Reserved"
+    printf '\033[0m'
     echo
+
+    # Existing menu options and input handling continue below.
+
     printf '%s%s%s\n' "$C_BOLD$C_CYAN" "MAIN MENU" "$C_RESET"
     echo
     echo " [01] Blueprint"
