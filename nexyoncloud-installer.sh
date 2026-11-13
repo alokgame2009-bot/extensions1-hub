@@ -12,6 +12,19 @@ DB_USER="pterodactyl"
 DB_PASS=""
 PHP_VERSION=""
 
+# Colors Fallback (Agar direct run ho toh error na aaye)
+C_RESET="${C_RESET:-$'\033[0m'}"
+C_BOLD="${C_BOLD:-$'\033[1m'}"
+C_DIM="${C_DIM:-$'\033[2m'}"
+C_CYAN="${C_CYAN:-$'\033[38;5;45m'}"
+C_BLUE="${C_BLUE:-$'\033[38;5;39m'}"
+C_GREEN="${C_GREEN:-$'\033[38;5;82m'}"
+C_YELLOW="${C_YELLOW:-$'\033[38;5;220m'}"
+C_RED="${C_RED:-$'\033[38;5;203m'}"
+C_WHITE="${C_WHITE:-$'\033[97m'}"
+C_GRAY="${C_GRAY:-$'\033[38;5;240m'}"
+C_PINK="${C_PINK:-$'\033[38;5;213m'}"
+
 die(){ echo; echo "[ERROR] $*" >&2; exit 1; }
 pause(){ echo; read -r -p "Press Enter to continue..." _; }
 root(){ [[ $EUID -eq 0 ]] || die "Run as root: sudo bash $0"; }
@@ -245,7 +258,7 @@ EOF
 }
 
 # ==========================================
-# USER MANAGEMENT FUNCTIONS (NEW)
+# USER MANAGEMENT FUNCTIONS
 # ==========================================
 
 create_user_manual() {
@@ -321,4 +334,108 @@ create_user_auto() {
         echo "  [FAIL] Could not create user."
     fi
     pause
+}
+
+# ==========================================
+# UPDATE PANEL FUNCTION (Screenshot Style)
+# ==========================================
+update_panel(){
+  clear
+  local cols=$(tput cols 2>/dev/null || echo 80)
+  
+  # Header
+  printf "${C_CYAN}╔══════════════════════════════════════════════════════════════════════╗${C_RESET}\n"
+  printf "${C_CYAN}║${C_RESET} ${C_WHITE}❖${C_RESET} ${C_BOLD}PTERODACTYL SERVER MANAGEMENT SYSTEM${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
+  printf "${C_CYAN}╚══════════════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+  
+  printf " ${C_YELLOW}▶${C_RESET} ${C_BOLD}Current Module:${C_RESET} ${C_YELLOW}UPDATE PANEL${C_RESET}\n"
+  printf " ${C_BLUE}%s${C_RESET}\n\n" "$(printf '─%.0s' $(seq 1 60))"
+  
+  # Version List
+  printf " ${C_CYAN}::${C_RESET} ${C_BOLD}Available Panel Versions${C_RESET}\n"
+  local versions=(
+    "v1.15.2" "v1.15.1" "v1.15.0" "v1.14.1" "v1.14.0" 
+    "v1.13.0" "v1.12.4" "v1.12.3" "v1.12.2" "v1.12.1" 
+    "v1.12.0" "v1.11.11" "v1.11.10" "v1.11.9" "v1.11.8" 
+    "v1.11.7" "v1.11.6" "v1.11.5"
+  )
+  
+  local i=1
+  for ver in "${versions[@]}"; do
+    printf " ${C_GREEN}%d.${C_RESET} ${C_WHITE}%s${C_RESET}\n" "$i" "$ver"
+    ((i++))
+  done
+  echo ""
+  
+  # Input Prompt (With Timeout)
+  printf " ${C_PINK}•${C_RESET} Select version ${C_DIM}[1-18]${C_RESET} ${C_DIM}[1 = latest]${C_RESET}\n"
+  
+  local selected_idx=""
+  # 10 second timeout
+  if read -r -t 10 -p "  └─> " selected_idx; then
+      :
+  else
+      echo ""
+      printf "  ${C_YELLOW}⏳${C_RESET} ${C_DIM}Timeout - using latest: ${C_WHITE}v1.15.2${C_RESET}\n"
+      selected_idx="1"
+  fi
+  
+  # Default to 1 if empty
+  selected_idx="${selected_idx:-1}"
+  
+  # Get selected version
+  local target_ver="${versions[$((selected_idx - 1))]}"
+  
+  # Review Box
+  echo ""
+  printf "  ${C_CYAN}┌─[ REVIEW CONFIGURATION ]${C_RESET}\n"
+  printf "  ${C_CYAN}│${C_RESET} Version: ${C_GREEN}%s${C_RESET}\n" "$target_ver"
+  printf "  ${C_CYAN}└────────────────────────────${C_RESET}\n\n"
+  
+  # Final Confirmation (With Timeout)
+  local confirm=""
+  if ! read -r -t 10 -p " ${C_BLUE}Start Installation? (Y/n) [auto: Y in 10s]:${C_RESET} " confirm; then
+      echo ""
+      printf "  ${C_YELLOW}⏳${C_RESET} ${C_DIM}Timeout - Proceeding automatically...${C_RESET}\n"
+      confirm="Y"
+  fi
+  
+  if [[ ! "$confirm" =~ ^[Yy]$ && -n "$confirm" ]]; then
+      echo "Cancelled."
+      return 1
+  fi
+  
+  # EXECUTION START
+  echo ""
+  echo "[1/5] Downloading Pterodactyl $target_ver..."
+  cd "$PANEL_DIR" || return 1
+  php artisan down || true
+  
+  local download_url="https://github.com/pterodactyl/panel/releases/download/${target_ver}/panel.tar.gz"
+  if ! curl -fL --retry 3 -o /tmp/panel.tar.gz "$download_url"; then
+      echo "[ERROR] Failed to download version $target_ver"
+      php artisan up
+      return 1
+  fi
+  
+  echo "[2/5] Extracting files..."
+  tar -xzf /tmp/panel.tar.gz --overwrite
+  rm -f /tmp/panel.tar.gz
+  
+  echo "[3/5] Installing Composer dependencies..."
+  COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader --no-interaction
+  
+  echo "[4/5] Running migrations..."
+  php artisan migrate --seed --force
+  
+  echo "[5/5] Finalizing..."
+  php artisan view:clear
+  php artisan config:clear
+  chown -R www-data:www-data "$PANEL_DIR"
+  php artisan up
+  systemctl restart pteroq
+  
+  echo ""
+  printf "${C_GREEN}✓ Panel updated to %s successfully!${C_RESET}\n" "$target_ver"
+  pause
 }
