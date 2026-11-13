@@ -284,12 +284,11 @@ center_line() {
   printf '%*s%s\n' "$pad" '' "$text"
 }
 
-# EXTENSION HUB LOGO
+
 show_logo() {
     local line
 
     printf '\033[1;94m'
-
     while IFS= read -r line; do
         center_line "$line"
     done <<'LOGO'
@@ -298,7 +297,7 @@ show_logo() {
 █████╗   ╚███╔╝    ██║   █████╗  ██╔██╗ ██║███████╗██║██║   ██║██╔██╗ ██║  ███████║██║   ██║██████╔╝
 ██╔══╝   ██╔██╗    ██║   ██╔══╝  ██║╚██╗██║╚════██║██║██║   ██║██║╚██╗██║  ██╔══██║██║   ██║██╔══██╗
 ███████╗██╔╝ ██╗   ██║   ███████╗██║ ╚████║███████║██║╚██████╔╝██║ ╚████║  ██║  ██║╚██████╔╝██████╔╝
-╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═╝  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
+╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
 LOGO
 
     printf '\033[1;96m'
@@ -307,9 +306,12 @@ LOGO
 }
 
 main_menu() {
+    local choice row cols prompt pad
+
     while true; do
         clear 2>/dev/null || true
 
+        # BRANDING
         show_logo
         echo
 
@@ -317,21 +319,23 @@ main_menu() {
         center_line "PTERODACTYL EXTENSION MANAGER"
         printf '\033[0m'
 
-        printf '\033[1;94m'
-        center_line "Manage • Customize • Extend"
+        printf '\033[0;94m'
+        center_line "Manage  •  Customize  •  Extend"
         printf '\033[0m'
 
         echo
+        echo
 
-        # FIXED WIDTH INFORMATION BOX
+        # INFORMATION PANEL
         printf '\033[1;94m'
         center_line "╔══════════════════════════════════╗"
 
         printf '\033[1;97m'
-        printf -v row '║  Version       : %-16s║' "$APP_VERSION"
+
+        printf -v row '║  Version       : %-16s║' "${APP_VERSION:0:16}"
         center_line "$row"
 
-        printf -v row '║  Made by       : %-16s║' "$AUTHOR"
+        printf -v row '║  Made by       : %-16s║' "${AUTHOR:0:16}"
         center_line "$row"
 
         printf -v row '║  Panel Version : %-16s║' "1.x.x"
@@ -343,48 +347,125 @@ main_menu() {
 
         echo
 
-        printf '\033[1;90m'
+        # COPYRIGHT
+        printf '\033[0;90m'
         center_line "© 2026 Extension Hub"
         center_line "All Rights Reserved"
         printf '\033[0m'
 
         echo
-    printf '\033[0m'
-    printf '%s%s%s\n' "$C_BOLD$C_CYAN" "MAIN MENU" "$C_RESET"
-    echo
-    echo " [01] Blueprint"
-    echo " [02] Themes"
-    echo " [03] Extensions"
-    printf ' [04] Zerix Theme %s(Coming Soon)%s\n' "$C_YELLOW" "$C_RESET"
-    echo
-    echo " [00] EXIT"
-    echo
-    read -r -p "Select an option [00-04]: " choice || exit 0
-    case "$choice" in
-      1|01) blueprint_menu ;;
-      2|02) placeholder_menu "THEMES" ;;
-      3|03) placeholder_menu "EXTENSIONS" ;;
-      4|04) clear 2>/dev/null || true; warn "Zerix Theme is coming soon."; pause ;;
-      0|00) echo "Goodbye."; exit 0 ;;
-      h|H) echo "Choose 01 Blueprint, 02 Themes, 03 Extensions, 04 Zerix Theme, or 00 Exit."; pause ;;
-      *) warn "Invalid option."; pause ;;
-    esac
-  done
+        echo
+
+        # MAIN MENU HEADER
+        printf '\033[1;96m'
+        center_line "━━━━━━━━━━━━━━ MAIN MENU ━━━━━━━━━━━━━━"
+        printf '\033[0m'
+
+        echo
+
+        # MENU OPTIONS
+        printf '\033[1;32m'
+        center_line "  [01]  Blueprint"
+        center_line "  [02]  Themes"
+        center_line "  [03]  Extensions"
+        printf '\033[0m'
+
+        printf '\033[1;33m'
+        center_line "  [04]  Zerix Theme  (Coming Soon)"
+        printf '\033[0m'
+
+        echo
+
+        printf '\033[1;94m'
+        center_line "  ────────────────────────────────────"
+        printf '\033[0m'
+
+        echo
+
+        printf '\033[1;31m'
+        center_line "  [00]  EXIT"
+        printf '\033[0m'
+
+        echo
+        echo
+
+        # CENTERED INPUT PROMPT
+        prompt="Select an option [00-04]: "
+        cols=$(tput cols 2>/dev/null || echo 100)
+        pad=$(( (cols - ${#prompt} - 4) / 2 ))
+        (( pad < 0 )) && pad=0
+
+        printf '\033[1;96m'
+        printf '%*s%s' "$pad" '' "$prompt"
+        printf '\033[1;32m'
+        read -r choice || exit 0
+        printf '\033[0m'
+
+        # MENU ACTIONS
+        case "$choice" in
+            1|01)
+                blueprint_menu
+                ;;
+            2|02)
+                placeholder_menu "THEMES"
+                ;;
+            3|03)
+                placeholder_menu "EXTENSIONS"
+                ;;
+            4|04)
+                clear 2>/dev/null || true
+                warn "Zerix Theme is coming soon."
+                pause
+                ;;
+            0|00)
+                echo
+                printf '\033[1;96m'
+                center_line "Thank you for using Extension Hub!"
+                printf '\033[0m'
+                exit 0
+                ;;
+            h|H)
+                echo "Choose 01 Blueprint, 02 Themes, 03 Extensions, 04 Zerix Theme, or 00 Exit."
+                pause
+                ;;
+            *)
+                warn "Invalid option. Please try again."
+                pause
+                ;;
+        esac
+    done
 }
 
+# COMMAND LINE INTERFACE
 case "${1:-}" in
-  blueprint)
-    case "${2:-}" in
-      status) detect_blueprint && echo "ONLINE" || echo "OFFLINE" ;;
-      install) install_blueprint ;;
-      update) update_blueprint ;;
-      version) echo "Blueprint: $(blueprint_version)"; echo "Panel: $(panel_version)" ;;
-      info) blueprint_info ;;
-      *) blueprint_menu ;;
-    esac
-    ;;
-  help|-h|--help)
-    echo "Usage: extension-hub [blueprint [status|install|update|version|info]]"
-    ;;
-  *) main_menu ;;
+    blueprint)
+        case "${2:-}" in
+            status)
+                detect_blueprint && echo "ONLINE" || echo "OFFLINE"
+                ;;
+            install)
+                install_blueprint
+                ;;
+            update)
+                update_blueprint
+                ;;
+            version)
+                echo "Blueprint: $(blueprint_version)"
+                echo "Panel: $(panel_version)"
+                ;;
+            info)
+                blueprint_info
+                ;;
+            *)
+                blueprint_menu
+                ;;
+        esac
+        ;;
+    help|-h|--help)
+        echo "Usage: extension-hub [blueprint [status|install|update|version|info]]"
+        ;;
+    *)
+        main_menu
+        ;;
 esac
+
