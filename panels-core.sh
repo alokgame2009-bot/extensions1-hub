@@ -3,8 +3,9 @@
 
 # Force fix for unbound variable error in strict mode
 C_PINK=$'\033[38;5;213m'
+C_PINK_DARK=$'\033[38;5;162m'
 
-# Fallback Colors for safety
+# Fallback Colors
 C_RESET="${C_RESET:-$'\033[0m'}"
 C_BOLD="${C_BOLD:-$'\033[1m'}"
 C_DIM="${C_DIM:-$'\033[2m'}"
@@ -71,63 +72,69 @@ playtely_panel_menu() {
     while true; do
         clear 2>/dev/null || true
         
-        # Pink Logo
+        # Pink Logo (Block Style)
         printf "${C_PINK}"
         cat << 'EOF'
-██████╗ ██╗      █████╗ ██╗   ██╗████████╗███████╗██╗  ██╗   ██╗
-██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔════╝██║  ██║   ██║
-██████╔╝██║     ███████║ ╚████╔╝    ██║   █████╗  ███████║   ██║
-██╔═══╝ ██║     ██╔══██║  ╚██╔╝     ██║   ██╔══╝  ██╔══██║   ██║
-██║     ███████╗██║  ██║   ██║      ██║   ███████╗██║  ██║   ██║
-╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝   ╚═╝
+  _____ _______ ______ _____   ____  _____          _____ _________     ___      
+ |  __ \__   __|  ____|  __ \ / __ \|  __ \   /\   / ____|__   __\ \   / / |     
+ | |__) | | |  | |__  | |__) | |  | | |  | | /  \ | |       | |   \ \_/ /| |     
+ |  ___/  | |  |  __| |  _  /| |  | | |  | |/ /\ \| |       | |    \   / | |     
+ | |      | |  | |____| | \ \| |__| | |__| / ____ \ |____   | |     | |  | |____ 
+ |_|      |_|  |______|_|  \_\\____/|_____/_/    \_\_____|  |_|     |_|  |______|
+                                                                                 
+                                                                                 
 EOF
         printf "${C_RESET}\n"
 
-        # Status Box
+        # Status Box (Always shown, just changes text)
         if detect_blueprint; then
             local b_ver=$(blueprint_version)
+            printf "${C_CYAN}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
             if [[ "$b_ver" == "Unknown" || -z "$b_ver" ]]; then
-                printf "${C_BLUE}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
-                printf "${C_BLUE}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET}                           ${C_BLUE}│${C_RESET}\n"
-                printf "${C_BLUE}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
+                printf "${C_CYAN}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET}                           ${C_CYAN}│${C_RESET}\n"
             else
-                printf "${C_BLUE}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
-                printf "${C_BLUE}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET} ${C_DIM}(v%s)${C_RESET}                   ${C_BLUE}│${C_RESET}\n" "$b_ver"
-                printf "${C_BLUE}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
+                printf "${C_CYAN}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET} ${C_DIM}(v%s)${C_RESET}                   ${C_CYAN}│${C_RESET}\n" "$b_ver"
             fi
+            printf "${C_CYAN}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
         else
-            printf "${C_BLUE}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
-            printf "${C_BLUE}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_RED}NOT INSTALLED${C_RESET} ${C_RED}✗${C_RESET}                       ${C_BLUE}│${C_RESET}\n"
-            printf "${C_BLUE}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
+            printf "${C_CYAN}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
+            printf "${C_CYAN}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_RED}NOT INSTALLED${C_RESET} ${C_RED}✗${C_RESET}                       ${C_CYAN}│${C_RESET}\n"
+            printf "${C_CYAN}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
         fi
 
-        # Action Box
-        printf "${C_BLUE}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
-        if detect_blueprint; then
-            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_WHITE}Reinstall${C_RESET}    ${C_DIM}:: (Fresh Setup)${C_RESET}                 ${C_BLUE}│${C_RESET}\n"
-            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[2]${C_RESET} ${C_WHITE}Update${C_RESET}       ${C_DIM}:: (Latest Release)${C_RESET}              ${C_BLUE}│${C_RESET}\n"
-            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[3]${C_RESET} ${C_WHITE}Panel Info${C_RESET}   ${C_DIM}:: (System Details)${C_RESET}              ${C_BLUE}│${C_RESET}\n"
-            printf "${C_BLUE}│${C_RESET}  ${C_RED}[4]${C_RESET} ${C_WHITE}Uninstall${C_RESET}    ${C_DIM}:: (Remove Data)${C_RESET}                 ${C_BLUE}│${C_RESET}\n"
-        else
-            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_WHITE}Install${C_RESET}      ${C_DIM}:: (Fresh Install)${C_RESET}               ${C_BLUE}│${C_RESET}\n"
-            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[2]${C_RESET} ${C_WHITE}User${C_RESET}         ${C_DIM}:: (Add Admin/User)${C_RESET}              ${C_BLUE}│${C_RESET}\n"
-            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[3]${C_RESET} ${C_WHITE}Update${C_RESET}       ${C_DIM}:: (Latest Release)${C_RESET}              ${C_BLUE}│${C_RESET}\n"
-            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[4]${C_RESET} ${C_WHITE}Domin${C_RESET}        ${C_DIM}:: (Change domain/ssl)${C_RESET}           ${C_BLUE}│${C_RESET}\n"
-            printf "${C_BLUE}│${C_RESET}  ${C_RED}[5]${C_RESET} ${C_WHITE}Uninstall${C_RESET}    ${C_DIM}:: (Remove Data)${C_RESET}                 ${C_BLUE}│${C_RESET}\n"
-            printf "${C_BLUE}│${C_RESET}  ${C_GREEN}[6]${C_RESET} ${C_WHITE}phpmyadmin${C_RESET}   ${C_DIM}:: (phpmyadmin Data)${C_RESET}             ${C_BLUE}│${C_RESET}\n"
-        fi
-        printf "${C_BLUE}├────────────────────────────────────────────────────────┤${C_RESET}\n"
-        printf "${C_BLUE}│${C_RESET}  ${C_RED}[0]${C_RESET} ${C_WHITE}Exit System${C_RESET}                                     ${C_BLUE}│${C_RESET}\n"
-        printf "${C_BLUE}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
+        # Action Box (Always shows all 6 options, but logic changes)
+        printf "${C_CYAN}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
+        
+        # Color codes for numbers
+        local num1="${C_GREEN}[1]${C_RESET}"
+        local num2="${C_GREEN}[2]${C_RESET}"
+        local num3="${C_GREEN}[3]${C_RESET}"
+        local num4="${C_RED}[4]${C_RESET}"     # Domin (Red)
+        local num5="${C_RED}[5]${C_RESET}"     # Uninstall (Red)
+        local num6="${C_GREEN}[6]${C_RESET}"
+
+        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}Install${C_RESET}      ${C_DIM}:: (Fresh Install)${C_RESET}               ${C_CYAN}│${C_RESET}\n" "$num1"
+        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}User${C_RESET}         ${C_DIM}:: (Add Admin/User)${C_RESET}              ${C_CYAN}│${C_RESET}\n" "$num2"
+        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}Update${C_RESET}       ${C_DIM}:: (Latest Release)${C_RESET}              ${C_CYAN}│${C_RESET}\n" "$num3"
+        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}Domin${C_RESET}        ${C_DIM}:: (Chang/domin/ssl)${C_RESET}            ${C_CYAN}│${C_RESET}\n" "$num4"
+        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}Uninstall${C_RESET}    ${C_DIM}:: (Remove Data)${C_RESET}                 ${C_CYAN}│${C_RESET}\n" "$num5"
+        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}phpmyadmin${C_RESET}   ${C_DIM}:: (phpmyadmin Data)${C_RESET}             ${C_CYAN}│${C_RESET}\n" "$num6"
+
+        printf "${C_CYAN}├────────────────────────────────────────────────────────┤${C_RESET}\n"
+        printf "${C_CYAN}│${C_RESET}  ${C_RED}[0]${C_RESET} ${C_WHITE}Exit System${C_RESET}                                     ${C_CYAN}│${C_RESET}\n"
+        printf "${C_CYAN}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
 
         read -r -p " λ Select Option: " p_choice || return
         
+        # Logic Handling
         if detect_blueprint; then
             case "$p_choice" in
                 1) reinstall_blueprint; pause ;;
-                2) update_blueprint; pause ;;
-                3) blueprint_info; pause ;;
-                4) uninstall_blueprint; pause ;;
+                2) clear; warn "User creation is not implemented yet."; pause ;;
+                3) update_blueprint; pause ;;
+                4) clear; warn "Domain/SSL management coming soon."; pause ;;
+                5) uninstall_blueprint; pause ;;
+                6) clear; warn "phpmyadmin setup coming soon."; pause ;;
                 0) return ;;
                 *) warn "Invalid option."; sleep 1 ;;
             esac
