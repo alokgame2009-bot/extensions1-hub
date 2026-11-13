@@ -66,34 +66,28 @@ menu_panel() {
 }
 
 # ==========================================
-# PLAYETY STYLE PANEL MENU (Inside Option 1)
+# PLAYTEH STYLE PANEL MENU (Inside Option 1)
 # ==========================================
 playtely_panel_menu() {
     while true; do
         clear 2>/dev/null || true
         
-        # Pink Logo (Block Style)
+        # Pink Logo
         printf "${C_PINK}"
         cat << 'EOF'
-  _____ _______ ______ _____   ____  _____          _____ _________     ___      
- |  __ \__   __|  ____|  __ \ / __ \|  __ \   /\   / ____|__   __\ \   / / |     
- | |__) | | |  | |__  | |__) | |  | | |  | | /  \ | |       | |   \ \_/ /| |     
- |  ___/  | |  |  __| |  _  /| |  | | |  | |/ /\ \| |       | |    \   / | |     
- | |      | |  | |____| | \ \| |__| | |__| / ____ \ |____   | |     | |  | |____ 
- |_|      |_|  |______|_|  \_\\____/|_____/_/    \_\_____|  |_|     |_|  |______|
-                                                                                                                                                              
+ _____ _______ ______ _____   ____  _____          _____ _________     ___      
+|  __ \__   __|  ____|  __ \ / __ \|  __ \   /\   / ____|__   __\ \   / / |     
+| |__) | | |  | |__  | |__) | |  | | |  | | /  \ | |       | |   \ \_/ /| |     
+|  ___/  | |  |  __| |  _  /| |  | | |  | |/ /\ \| |       | |    \   / | |     
+| |      | |  | |____| | \ \| |__| | |__| / ____ \ |____   | |     | |  | |____ 
+|_|      |_|  |______|_|  \_\\____/|_____/_/    \_\_____|  |_|     |_|  |______|                                                                               
 EOF
         printf "${C_RESET}\n"
 
-        # Status Box (Always shown, just changes text)
-        if detect_blueprint; then
-            local b_ver=$(blueprint_version)
+        # Status Box
+        if [[ -d "/var/www/pterodactyl" && -f "/var/www/pterodactyl/artisan" ]]; then
             printf "${C_CYAN}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
-            if [[ "$b_ver" == "Unknown" || -z "$b_ver" ]]; then
-                printf "${C_CYAN}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET}                           ${C_CYAN}│${C_RESET}\n"
-            else
-                printf "${C_CYAN}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET} ${C_DIM}(v%s)${C_RESET}                   ${C_CYAN}│${C_RESET}\n" "$b_ver"
-            fi
+            printf "${C_CYAN}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET}                           ${C_CYAN}│${C_RESET}\n"
             printf "${C_CYAN}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
         else
             printf "${C_CYAN}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
@@ -101,53 +95,61 @@ EOF
             printf "${C_CYAN}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
         fi
 
-        # Action Box (Always shows all 6 options, but logic changes)
+        # Action Box
         printf "${C_CYAN}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
-        
-        # Color codes for numbers
-        local num1="${C_GREEN}[1]${C_RESET}"
-        local num2="${C_GREEN}[2]${C_RESET}"
-        local num3="${C_GREEN}[3]${C_RESET}"
-        local num4="${C_RED}[4]${C_RESET}"     # Domin (Red)
-        local num5="${C_RED}[5]${C_RESET}"     # Uninstall (Red)
-        local num6="${C_GREEN}[6]${C_RESET}"
-
-        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}Install${C_RESET}      ${C_DIM}:: (Fresh Install)${C_RESET}               ${C_CYAN}│${C_RESET}\n" "$num1"
-        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}User${C_RESET}         ${C_DIM}:: (Add Admin/User)${C_RESET}              ${C_CYAN}│${C_RESET}\n" "$num2"
-        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}Update${C_RESET}       ${C_DIM}:: (Latest Release)${C_RESET}              ${C_CYAN}│${C_RESET}\n" "$num3"
-        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}Domin${C_RESET}        ${C_DIM}:: (Chang/domin/ssl)${C_RESET}            ${C_CYAN}│${C_RESET}\n" "$num4"
-        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}Uninstall${C_RESET}    ${C_DIM}:: (Remove Data)${C_RESET}                 ${C_CYAN}│${C_RESET}\n" "$num5"
-        printf "${C_CYAN}│${C_RESET}  %s ${C_WHITE}phpmyadmin${C_RESET}   ${C_DIM}:: (phpmyadmin Data)${C_RESET}             ${C_CYAN}│${C_RESET}\n" "$num6"
-
+        printf "${C_CYAN}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_WHITE}Install${C_RESET}      ${C_DIM}:: (Fresh Install)${C_RESET}               ${C_CYAN}│${C_RESET}\n"
+        printf "${C_CYAN}│${C_RESET}  ${C_GREEN}[2]${C_RESET} ${C_WHITE}User${C_RESET}         ${C_DIM}:: (Add Admin/User)${C_RESET}              ${C_CYAN}│${C_RESET}\n"
+        printf "${C_CYAN}│${C_RESET}  ${C_GREEN}[3]${C_RESET} ${C_WHITE}Update${C_RESET}       ${C_DIM}:: (Latest Release)${C_RESET}              ${C_CYAN}│${C_RESET}\n"
+        printf "${C_CYAN}│${C_RESET}  ${C_RED}[4]${C_RESET} ${C_WHITE}Domin${C_RESET}        ${C_DIM}:: (Chang/domin/ssl)${C_RESET}            ${C_CYAN}│${C_RESET}\n"
+        printf "${C_CYAN}│${C_RESET}  ${C_RED}[5]${C_RESET} ${C_WHITE}Uninstall${C_RESET}    ${C_DIM}:: (Remove Data)${C_RESET}                 ${C_CYAN}│${C_RESET}\n"
+        printf "${C_CYAN}│${C_RESET}  ${C_GREEN}[6]${C_RESET} ${C_WHITE}phpmyadmin${C_RESET}   ${C_DIM}:: (phpmyadmin Data)${C_RESET}             ${C_CYAN}│${C_RESET}\n"
         printf "${C_CYAN}├────────────────────────────────────────────────────────┤${C_RESET}\n"
         printf "${C_CYAN}│${C_RESET}  ${C_RED}[0]${C_RESET} ${C_WHITE}Exit System${C_RESET}                                     ${C_CYAN}│${C_RESET}\n"
         printf "${C_CYAN}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
 
         read -r -p " λ Select Option: " p_choice || return
         
-        # Logic Handling
-        if detect_blueprint; then
-            case "$p_choice" in
-                1) reinstall_blueprint; pause ;;
-                2) clear; warn "User creation is not implemented yet."; pause ;;
-                3) update_blueprint; pause ;;
-                4) clear; warn "Domain/SSL management coming soon."; pause ;;
-                5) uninstall_blueprint; pause ;;
-                6) clear; warn "phpmyadmin setup coming soon."; pause ;;
-                0) return ;;
-                *) warn "Invalid option."; sleep 1 ;;
-            esac
-        else
-            case "$p_choice" in
-                1) install_blueprint; pause ;;
-                2) clear; warn "User creation is not implemented yet."; pause ;;
-                3) clear; warn "Update requires panel to be installed first."; pause ;;
-                4) clear; warn "Domain/SSL management coming soon."; pause ;;
-                5) clear; warn "Nothing to uninstall."; pause ;;
-                6) clear; warn "phpmyadmin setup coming soon."; pause ;;
-                0) return ;;
-                *) warn "Invalid option."; sleep 1 ;;
-            esac
+        # Yahan hum aapke diye hue NexyonCloud Installer ko call kar rahe hain
+        local INSTALLER_SCRIPT="/opt/extension-hub/nexyoncloud-installer.sh"
+        
+        if [[ ! -f "$INSTALLER_SCRIPT" ]]; then
+            # Fallback to fetch from GitHub if not found locally
+            INSTALLER_SCRIPT="/tmp/nexyoncloud-installer.sh"
+            if [[ ! -f "$INSTALLER_SCRIPT" ]]; then
+                curl -fsSL "https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main/nexyoncloud-installer.sh" -o "$INSTALLER_SCRIPT" 2>/dev/null || true
+            fi
         fi
+
+        case "$p_choice" in
+            1) 
+                if [[ -f "$INSTALLER_SCRIPT" ]]; then
+                    bash "$INSTALLER_SCRIPT"
+                else
+                    warn "NexyonCloud Installer script not found!"
+                fi
+                pause 
+                ;;
+            2) clear; warn "User creation is not implemented yet."; pause ;;
+            3) 
+                if [[ -f "$INSTALLER_SCRIPT" ]]; then
+                     bash "$INSTALLER_SCRIPT" --update 2>/dev/null || bash "$INSTALLER_SCRIPT"
+                else
+                    warn "Update script not found."
+                fi
+                pause 
+                ;;
+            4) clear; warn "Domain/SSL management coming soon."; pause ;;
+            5) 
+                if [[ -f "$INSTALLER_SCRIPT" ]]; then
+                     bash "$INSTALLER_SCRIPT" --uninstall 2>/dev/null || bash "$INSTALLER_SCRIPT"
+                else
+                    warn "Uninstall script not found."
+                fi
+                pause 
+                ;;
+            6) clear; warn "phpmyadmin setup coming soon."; pause ;;
+            0) return ;;
+            *) warn "Invalid option."; sleep 1 ;;
+        esac
     done
 }
