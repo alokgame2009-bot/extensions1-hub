@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 # panels-core.sh - Pterodactyl Panel Manager UI
 
-# Force fix for unbound variable error in strict mode
 C_PINK=$'\033[38;5;213m'
-C_PINK_DARK=$'\033[38;5;162m'
-
-# Fallback Colors
 C_RESET="${C_RESET:-$'\033[0m'}"
 C_BOLD="${C_BOLD:-$'\033[1m'}"
 C_DIM="${C_DIM:-$'\033[2m'}"
@@ -20,25 +16,19 @@ C_GRAY="${C_GRAY:-$'\033[38;5;240m'}"
 menu_panel() {
     while true; do
         clear 2>/dev/null || true
-        
-        # Top Header Bar
         printf "${C_CYAN}╔══════════════════════════════════════════════════════════════════════╗${C_RESET}\n"
         printf "${C_CYAN}║${C_RESET} ${C_WHITE}❖${C_RESET} ${C_BOLD}SERVER PANEL MANAGER${C_RESET} ${C_DIM}v15.0${C_RESET}                          $(date +%H:%M) ${C_CYAN}║${C_RESET}\n"
         printf "${C_CYAN}╚══════════════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
         
-        # System Status
         local up=$(uptime -p 2>/dev/null | sed 's/up //' || echo "Unknown")
         local load=$(cat /proc/loadavg | awk '{print $1}')
         printf " ${C_CYAN}SYSTEM STATUS${C_RESET}\n"
         printf "  ${C_GRAY}└─${C_RESET} ${C_DIM}Uptime${C_RESET} : ${C_WHITE}%s${C_RESET}\n" "$up"
         printf "  ${C_GRAY}└─${C_RESET} ${C_DIM}Load${C_RESET}   : ${C_WHITE}%s${C_RESET}\n\n" "$load"
-        
         printf " ${C_BLUE}%s${C_RESET}\n\n" "$(printf '─%.0s' $(seq 1 60))"
 
-        # Available Deployments Header
         printf " ${C_YELLOW}▶${C_RESET} ${C_BOLD}${C_YELLOW}AVAILABLE DEPLOYMENTS${C_RESET}\n\n"
 
-        # Menu Box
         printf "${C_GRAY}╭──────────────────────────────┬──────────────────────────────╮${C_RESET}\n"
         printf "${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}1${C_WHITE}]${C_RESET} ${C_CYAN}Pterodactyl v1${C_RESET}       ${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}7${C_WHITE}]${C_RESET} ${C_CYAN}Pterodactyl v2${C_RESET}       ${C_GRAY}│${C_RESET}\n"
         printf "${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}2${C_WHITE}]${C_RESET} ${C_GRAY}NovaStudio (soon)${C_RESET}     ${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}8${C_WHITE}]${C_RESET} ${C_CYAN}CtrlPanel${C_RESET}            ${C_GRAY}│${C_RESET}\n"
@@ -48,7 +38,6 @@ menu_panel() {
         printf "${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}6${C_WHITE}]${C_RESET} ${C_CYAN}Paymenter${C_RESET}            ${C_GRAY}│${C_RESET} ${C_WHITE}[${C_RED}0${C_WHITE}]${C_RESET}  ${C_RED}Exit${C_RESET}                 ${C_GRAY}│${C_RESET}\n"
         printf "${C_GRAY}╰──────────────────────────────┴──────────────────────────────╯${C_RESET}\n\n"
 
-        # User Input
         read -r -p " λ Select Module [1-11]: " choice || return
         
         case "$choice" in
@@ -65,25 +54,23 @@ menu_panel() {
     done
 }
 
-# ==========================================
-# PLAYTEH STYLE PANEL MENU (Inside Option 1)
-# ==========================================
 playtely_panel_menu() {
     while true; do
         clear 2>/dev/null || true
         
-        # Pink Logo
         printf "${C_PINK}"
- _____ _______ ______ _____   ____  _____          _____ _________     ___      
-|  __ \__   __|  ____|  __ \ / __ \|  __ \   /\   / ____|__   __\ \   / / |     
-| |__) | | |  | |__  | |__) | |  | | |  | | /  \ | |       | |   \ \_/ /| |     
-|  ___/  | |  |  __| |  _  /| |  | | |  | |/ /\ \| |       | |    \   / | |     
-| |      | |  | |____| | \ \| |__| | |__| / ____ \ |____   | |     | |  | |____ 
-|_|      |_|  |______|_|  \_\\____/|_____/_/    \_\_____|  |_|     |_|  |______|                                                                                 
+        cat << 'EOF'
+ _____  _                     _            _         _ 
+|  __ \| |                   | |          | |       | |
+| |__) | |_ ___ _ __ ___   __| | __ _  ___| |_ _   _| |
+|  ___/| __/ _ \ '__/ _ \ / _` |/ _` |/ __| __| | | | |
+| |    | ||  __/ | | (_) | (_| | (_| | (__| |_| |_| | |
+|_|     \__\___|_|  \___/ \__,_|\__,_|\___|\__|\__, |_|
+                                                 __/ |  
+                                                |___/   
 EOF
         printf "${C_RESET}\n"
 
-        # Status Box
         if [[ -d "/var/www/pterodactyl" && -f "/var/www/pterodactyl/artisan" ]]; then
             printf "${C_CYAN}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
             printf "${C_CYAN}│${C_RESET} ${C_BOLD}PANEL STATUS:${C_RESET} ${C_GREEN}INSTALLED${C_RESET} ${C_GREEN}✓${C_RESET}                           ${C_CYAN}│${C_RESET}\n"
@@ -94,7 +81,6 @@ EOF
             printf "${C_CYAN}└────────────────────────────────────────────────────────┘${C_RESET}\n\n"
         fi
 
-        # Action Box
         printf "${C_CYAN}┌────────────────────────────────────────────────────────┐${C_RESET}\n"
         printf "${C_CYAN}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_WHITE}Install${C_RESET}      ${C_DIM}:: (Fresh Install)${C_RESET}               ${C_CYAN}│${C_RESET}\n"
         printf "${C_CYAN}│${C_RESET}  ${C_GREEN}[2]${C_RESET} ${C_WHITE}User${C_RESET}         ${C_DIM}:: (Add Admin/User)${C_RESET}              ${C_CYAN}│${C_RESET}\n"
@@ -110,7 +96,6 @@ EOF
         
         local INSTALLER_SCRIPT="/opt/extension-hub/nexyoncloud-installer.sh"
         
-        # Source the installer script so we can call its functions directly
         if [[ -f "$INSTALLER_SCRIPT" ]]; then
             source "$INSTALLER_SCRIPT"
         else
@@ -121,26 +106,37 @@ EOF
 
         case "$p_choice" in
             1) 
-                # Direct call to install function
-                install_panel
+                # Yahan aapka naya input_config call hoga
+                if input_config; then
+                    echo "[1/6] Installing dependencies..."
+                    install_deps
+                    echo "[2/6] Creating database..."
+                    database
+                    echo "[3/6] Installing Pterodactyl..."
+                    panel
+                    echo "[4/6] Configuring NGINX..."
+                    nginx_config
+                    echo "[5/6] Configuring queue + scheduler..."
+                    services
+                    echo "[6/6] Saving credentials..."
+                    save
+                    
+                    echo
+                    echo "╔══════════════════════════════════════════════╗"
+                    echo "║          INSTALLATION COMPLETE               ║"
+                    echo "╚══════════════════════════════════════════════╝"
+                    echo
+                    echo "Panel: https://$DOMAIN"
+                    echo "Admin: $ADMIN_USER"
+                    echo "Credentials: /root/nexyoncloud-pterodactyl-credentials.txt"
+                fi
                 pause 
                 ;;
-            2) 
-                clear; warn "User creation is not implemented yet."; pause ;;
-            3) 
-                # Direct call to update function
-                update_panel
-                pause 
-                ;;
-            4) 
-                clear; warn "Domain/SSL management coming soon."; pause ;;
-            5) 
-                # Direct call to uninstall function
-                uninstall_panel
-                pause 
-                ;;
-            6) 
-                clear; warn "phpmyadmin setup coming soon."; pause ;;
+            2) clear; warn "User creation is not implemented yet."; pause ;;
+            3) update_panel; pause ;;
+            4) clear; warn "Domain/SSL management coming soon."; pause ;;
+            5) uninstall_panel; pause ;;
+            6) clear; warn "phpmyadmin setup coming soon."; pause ;;
             0) return ;;
             *) warn "Invalid option."; sleep 1 ;;
         esac
