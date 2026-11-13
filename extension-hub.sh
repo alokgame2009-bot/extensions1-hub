@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Extension Hub v2.0 - Photo 2 Style Menu
+# Extension Hub v2.5 - Full UI (Logo + Photo 2 Style)
 # Made by Ziro | Powered by NexyonCloud
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v2.0"
+APP_VERSION="v2.5"
 AUTHOR="Ziro"
 PANEL_DIR="${PTERODACTYL_DIRECTORY:-/var/www/pterodactyl}"
 BLUEPRINT_RELEASE_URL="https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip"
@@ -65,11 +65,39 @@ get_network_status() {
 }
 
 # ==========================================
-# PHOTO 2 STYLE UI
+# UI & DISPLAY
 # ==========================================
 
-draw_header() {
+center_line() {
+    local text="$1"
+    local cols
+    cols=$(tput cols 2>/dev/null || echo 80)
+    local len=${#text}
+    local padding=$(( (cols - len) / 2 ))
+    if [ "$padding" -lt 0 ]; then padding=0; fi
+    printf "%${padding}s%s\n" "" "$text"
+}
+
+show_logo() {
+    local line
+    printf "${C_BLUE}"
+    while IFS= read -r line; do
+        center_line "$line"
+    done <<'LOGO'
+███████╗██╗  ██╗████████╗███████╗███╗   ██╗███████╗██╗ ██████╗ ███╗   ██╗  ██╗  ██╗██╗   ██╗██████╗
+██╔════╝╚██╗██╔╝╚══██╔══╝██╔════╝████╗  ██║██╔════╝██║██╔═══██╗████╗  ██║  ██║  ██║██║   ██║██╔══██╗
+█████╗   ╚███╔╝    ██║   █████╗  ██╔██╗ ██║███████╗██║██║   ██║██╔██╗ ██║  ███████║██║   ██║██████╔╝
+██╔══╝   ██╔██╗    ██║   ██╔══╝  ██║╚██╗██║╚════██║██║██║   ██║██║╚██╗██║  ██╔══██║██║   ██║██╔══██╗
+███████╗██╔╝ ██╗   ██║   ███████╗██║ ╚████║███████║██║╚██████╔╝██║ ╚████║  ██║  ██║╚██████╔╝██████╔╝
+╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
+LOGO
+    printf "${C_RESET}\n"
+}
+
+draw_ui() {
     clear 2>/dev/null || true
+    show_logo
+    echo ""
     local cols=$(tput cols 2>/dev/null || echo 80)
     
     # Top separator
@@ -80,11 +108,7 @@ draw_header() {
     printf "   ${C_DIM}CPU Usage:${C_RESET} ${C_CYAN}%s%%${C_RESET}     " "$(get_cpu_usage)"
     printf "${C_DIM}RAM Usage:${C_RESET} ${C_CYAN}%s%%${C_RESET}     " "$(get_ram_usage)"
     printf "${C_DIM}Network:${C_RESET} %s\n\n" "$(get_network_status)"
-}
 
-draw_menu() {
-    local cols=$(tput cols 2>/dev/null || echo 80)
-    
     # DEPLOYMENT & SERVICES Section
     printf " ${C_CYAN}::${C_RESET} ${C_BOLD}DEPLOYMENT & SERVICES${C_RESET}\n"
     printf "  ├── ${C_WHITE}[${C_YELLOW}1${C_WHITE}]${C_RESET} %-20s  " "Panel"
@@ -109,22 +133,30 @@ draw_menu() {
 }
 
 # ==========================================
-# MENU ACTIONS (YOUR LOGIC)
+# MENU ACTIONS
 # ==========================================
 
 menu_panel() {
     clear
     printf "${C_CYAN}=== PANEL MANAGER ===${C_RESET}\n\n"
-    printf "1. Install/Update Panel\n"
-    printf "2. Check Panel Version\n"
-    printf "3. Reinstall Panel\n"
-    printf "0. Back\n\n"
-    read -r -p "Select: " ch
-    case "$ch" in
-        1) install_blueprint; pause ;;
-        2) blueprint_info; pause ;;
-        3) reinstall_blueprint; pause ;;
-    esac
+    if detect_blueprint; then
+        printf " ${C_GREEN}● Status: ONLINE${C_RESET} (Blueprint v%s)\n\n" "$(blueprint_version)"
+        printf "1. Reinstall Panel\n2. Update Panel\n3. Panel Info\n4. Uninstall Blueprint\n0. Back\n\n"
+        read -r -p "Select: " ch
+        case "$ch" in
+            1) reinstall_blueprint; pause ;;
+            2) update_blueprint; pause ;;
+            3) blueprint_info; pause ;;
+            4) uninstall_blueprint; pause ;;
+        esac
+    else
+        printf " ${C_RED}● Status: OFFLINE${C_RESET} (Blueprint not found)\n\n"
+        printf "1. Install Panel (Blueprint)\n0. Back\n\n"
+        read -r -p "Select: " ch
+        case "$ch" in
+            1) install_blueprint; pause ;;
+        esac
+    fi
 }
 
 menu_wings() {
@@ -137,13 +169,12 @@ menu_wings() {
 menu_toolbox() {
     clear
     printf "${C_CYAN}=== TOOLBOX ===${C_RESET}\n\n"
-    printf "1. System Check\n"
-    printf "2. View Logs\n"
-    printf "0. Back\n\n"
+    printf "1. System Check\n2. View Logs\n3. Clear Cache\n0. Back\n\n"
     read -r -p "Select: " ch
     case "$ch" in
         1) system_check; pause ;;
         2) view_logs; pause ;;
+        3) warn "Cache clear not implemented."; pause ;;
     esac
 }
 
@@ -228,6 +259,24 @@ menu_help() {
 # CORE LOGIC (Blueprint & System)
 # ==========================================
 
+make_backup() {
+  valid_panel_dir || { err "Panel directory invalid."; return 1; }
+  local stamp archive
+  stamp="$(date '+%Y%m%d-%H%M%S')"
+  archive="$BACKUP_DIR/panel-blueprint-$stamp.tar.gz"
+  info "Creating backup: $archive"
+  tar -czf "$archive" -C "$PANEL_DIR" \
+    --ignore-failed-read \
+    .blueprintrc blueprint.sh blueprint release.zip \
+    resources public app routes 2>/dev/null || {
+      rm -f "$archive"
+      err "Backup failed. No changes were made."
+      return 1
+    }
+  chmod 600 "$archive"
+  ok "Backup created: $archive"
+}
+
 install_dependencies() {
   need_root || return 1
   if ! command_exists apt-get; then err "Requires Debian/Ubuntu (apt)."; return 1; fi
@@ -254,10 +303,9 @@ install_blueprint() {
   read -r -p "Continue? [y/N]: " answer
   [[ "$answer" =~ ^[Yy]$ ]] || return 0
   
-  # Assuming make_backup and other checks are skipped for brevity, 
-  # but in a real script, keep your backup logic here.
-  
+  make_backup || return 1
   install_dependencies || return 1
+  
   TMP_DIR="$(mktemp -d)"
   info "Downloading latest Blueprint..."
   curl -fL --retry 3 "$BLUEPRINT_RELEASE_URL" -o "$TMP_DIR/release.zip"
@@ -266,6 +314,56 @@ install_blueprint() {
   chmod +x "$PANEL_DIR/blueprint.sh"
   (cd "$PANEL_DIR" && bash ./blueprint.sh)
   ok "Blueprint installed successfully."
+}
+
+update_blueprint() {
+  need_root || return 1
+  detect_blueprint || { err "Blueprint is not installed."; return 1; }
+  read -r -p "Create backup and continue? [y/N]: " answer
+  [[ "$answer" =~ ^[Yy]$ ]] || return 0
+  make_backup || return 1
+  TMP_DIR="$(mktemp -d)"
+  curl -fL --retry 3 "$BLUEPRINT_RELEASE_URL" -o "$TMP_DIR/release.zip"
+  cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
+  (cd "$PANEL_DIR" && unzip -o release.zip && yarn install)
+  chmod +x "$PANEL_DIR/blueprint.sh"
+  (cd "$PANEL_DIR" && bash ./blueprint.sh)
+  ok "Blueprint update completed."
+}
+
+reinstall_blueprint() {
+  need_root || return 1
+  detect_blueprint || { err "Blueprint is not installed."; return 1; }
+  read -r -p "Continue after backup? [y/N]: " answer
+  [[ "$answer" =~ ^[Yy]$ ]] || return 0
+  make_backup || return 1
+  TMP_DIR="$(mktemp -d)"
+  install_dependencies || return 1
+  curl -fL --retry 3 "$BLUEPRINT_RELEASE_URL" -o "$TMP_DIR/release.zip"
+  cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
+  (cd "$PANEL_DIR" && unzip -o release.zip && yarn install)
+  chmod +x "$PANEL_DIR/blueprint.sh"
+  (cd "$PANEL_DIR" && bash ./blueprint.sh)
+  ok "Blueprint reinstall completed."
+}
+
+blueprint_info() {
+  echo
+  printf '%s\n' "Blueprint directory : $PANEL_DIR"
+  printf 'Blueprint detected  : '; detect_blueprint && echo "YES" || echo "NO"
+  printf 'Panel version       : %s\n' "$(panel_version)"
+  printf 'Blueprint version   : %s\n' "$(blueprint_version)"
+  printf 'Node.js             : %s\n' "$(node --version 2>/dev/null || echo Missing)"
+  printf 'Yarn                : %s\n' "$(yarn --version 2>/dev/null || echo Missing)"
+  echo
+}
+
+uninstall_blueprint() {
+  need_root || return 1
+  detect_blueprint || { err "Blueprint is not detected."; return 1; }
+  warn "Automatic uninstall is disabled to prevent breaking your panel."
+  read -r -p "Create a safety backup now? [y/N]: " answer
+  [[ "$answer" =~ ^[Yy]$ ]] && make_backup
 }
 
 system_check() {
@@ -288,10 +386,7 @@ view_logs() {
 
 main_menu() {
     while true; do
-        draw_header
-        draw_menu
-        
-        # Read input (No error here now)
+        draw_ui
         read -r -p " ➔ Enter Option (0-10): " choice || exit 0
         
         case "$choice" in
