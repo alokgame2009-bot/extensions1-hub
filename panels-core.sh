@@ -32,22 +32,11 @@ menu_panel() {
         # Colorful Menu Box
         printf "${C_GRAY}╭──────────────────────────────┬──────────────────────────────╮${C_RESET}\n"
         
-        # Row 1
         printf "${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}1${C_WHITE}]${C_RESET} ${C_CYAN}Pterodactyl v1${C_RESET}       ${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}7${C_WHITE}]${C_RESET} ${C_GRAY}soon${C_RESET}                 ${C_GRAY}│${C_RESET}\n"
-        
-        # Row 2
         printf "${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}2${C_WHITE}]${C_RESET} ${C_GRAY}soon${C_RESET}                  ${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}8${C_WHITE}]${C_RESET} ${C_CYAN}CtrlPanel${C_RESET}            ${C_GRAY}│${C_RESET}\n"
-        
-        # Row 3
         printf "${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}3${C_WHITE}]${C_RESET} ${C_GRAY}soon${C_RESET}                  ${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}9${C_WHITE}]${C_RESET} ${C_CYAN}Heliactyl${C_RESET}            ${C_GRAY}│${C_RESET}\n"
-        
-        # Row 4
         printf "${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}4${C_WHITE}]${C_RESET} ${C_GRAY}soon${C_RESET}                  ${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}10${C_WHITE}]${C_RESET} ${C_GRAY}soon${C_RESET}                 ${C_GRAY}│${C_RESET}\n"
-        
-        # Row 5
         printf "${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}5${C_WHITE}]${C_RESET} ${C_GRAY}soon${C_RESET}                  ${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}11${C_WHITE}]${C_RESET} ${C_GRAY}soon${C_RESET}                 ${C_GRAY}│${C_RESET}\n"
-        
-        # Row 6
         printf "${C_GRAY}│${C_RESET} ${C_WHITE}[${C_GREEN}6${C_WHITE}]${C_RESET} ${C_CYAN}Paymenter${C_RESET}            ${C_GRAY}│${C_RESET} ${C_WHITE}[${C_RED}0${C_WHITE}]${C_RESET}  ${C_RED}Exit${C_RESET}                 ${C_GRAY}│${C_RESET}\n"
         
         printf "${C_GRAY}╰──────────────────────────────┴──────────────────────────────╯${C_RESET}\n\n"
@@ -56,15 +45,70 @@ menu_panel() {
         
         case "$choice" in
             1) playtely_panel_menu ;;
-            2|3|4|5|7|10|11) 
+            2|3|5|7|10|11) 
                 clear
                 printf "\n ${C_GRAY}:: Coming Soon${C_RESET}\n\n"
                 warn "This module is not implemented yet."
                 pause 
                 ;;
+            4) playtely_theme_menu ;;
             6) clear; printf "${C_PURPLE}--- Paymenter ---${C_RESET}\n\n"; warn "Coming soon."; pause ;;
             8) clear; printf "${C_CYAN}--- CtrlPanel ---${C_RESET}\n\n"; warn "Coming soon."; pause ;;
             9) clear; printf "${C_CYAN}--- Heliactyl ---${C_RESET}\n\n"; warn "Coming soon."; pause ;;
+            0) return ;;
+            *) warn "Invalid option."; sleep 1 ;;
+        esac
+    done
+}
+
+# ==========================================
+# THEME MENU (Screenshot Style without Hyper V1)
+# ==========================================
+playtely_theme_menu() {
+    while true; do
+        clear 2>/dev/null || true
+        
+        # Top Box (Cyan Border, Pink Text, Centered)
+        printf "${C_CYAN}╔══════════════════════════════════════════════════════════════════════╗${C_RESET}\n"
+        printf "${C_CYAN}║${C_RESET}                         ${C_PINK}CONTROL PANEL UI${C_RESET}                          ${C_CYAN}║${C_RESET}\n"
+        printf "${C_CYAN}╚══════════════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+        
+        # Status
+        if [[ -d "/var/www/pterodactyl" && -f "/var/www/pterodactyl/artisan" ]]; then
+            printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
+        else
+            printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}○ OFFLINE${C_RESET}\n\n"
+        fi
+        
+        # Menu Options (Green numbers, Blue text)
+        printf "  ${C_GREEN}[1]${C_RESET} ${C_CYAN}Blueprint${C_RESET}\n"
+        printf "  ${C_GREEN}[2]${C_RESET} ${C_CYAN}Theme${C_RESET}\n"
+        printf "  ${C_GREEN}[3]${C_RESET} ${C_CYAN}Extensions${C_RESET}\n\n"
+        
+        printf "  ${C_RED}[0]${C_RESET} ${C_RED}Exit${C_RESET}\n\n"
+        
+        # Prompt
+        read -r -p " ${C_GREEN}▶ Select Option :${C_RESET} " t_choice || return
+        
+        case "$t_choice" in
+            1) 
+                clear
+                printf "  ${C_CYAN}--- Blueprint Management ---${C_RESET}\n\n"
+                warn "Blueprint installation is handled from Panel -> [1] Pterodactyl v1 -> [1] Install."
+                pause 
+                ;;
+            2) 
+                clear
+                printf "  ${C_CYAN}--- Theme Management ---${C_RESET}\n\n"
+                warn "Theme manager coming soon."
+                pause 
+                ;;
+            3) 
+                clear
+                printf "  ${C_CYAN}--- Extensions ---${C_RESET}\n\n"
+                warn "Extensions manager coming soon."
+                pause 
+                ;;
             0) return ;;
             *) warn "Invalid option."; sleep 1 ;;
         esac
@@ -77,14 +121,12 @@ playtely_panel_menu() {
         
         printf "${C_PINK}"
         cat << 'EOF'
- _____  _                     _            _         _ 
-|  __ \| |                   | |          | |       | |
-| |__) | |_ ___ _ __ ___   __| | __ _  ___| |_ _   _| |
-|  ___/| __/ _ \ '__/ _ \ / _` |/ _` |/ __| __| | | | |
-| |    | ||  __/ | | (_) | (_| | (_| | (__| |_| |_| | |
-|_|     \__\___|_|  \___/ \__,_|\__,_|\___|\__|\__, |_|
-                                                 __/ |  
-                                                |___/   
+██████╗ ██╗      █████╗ ██╗   ██╗████████╗███████╗██╗  ██╗
+██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔════╝██║  ██║
+██████╔╝██║     ███████║ ╚████╔╝    ██║   █████╗  ███████║
+██╔═══╝ ██║     ██╔══██║  ╚██╔╝     ██║   ██╔══╝  ██╔══██║
+██║     ███████╗██║  ██║   ██║      ██║   ███████╗██║  ██║
+╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
 EOF
         printf "${C_RESET}\n"
 
