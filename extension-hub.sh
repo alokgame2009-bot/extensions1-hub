@@ -129,8 +129,8 @@ show_logo() {
 ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ 
 LOGO
     printf "${C_RESET}\n"
-    center_line "${C_YELLOW}Z I R O   E D I T I O N   —   O B S I D I A N   N E X T   G E N${C_RESET}"
-    center_line "${C_GRAY}Powered by NexyonCloud${C_RESET}"
+center_line "${C_YELLOW}Z I R O   E D I T I O N   —   O B S I D I A N   N E X T   G E N${C_RESET}"
+center_line "${C_GRAY}Powered by NexyonCloud${C_RESET}"
     echo ""
 }
 
