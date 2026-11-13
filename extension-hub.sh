@@ -266,94 +266,84 @@ blueprint_menu() {
   done
 }
 
+
 center_line() {
-  local text="$1"
-  local cols pad len
+    local text="$1"
+    local cols pad
 
-  cols=$(tput cols 2>/dev/null || echo 100)
-  len=${#text}
-  pad=$(( (cols - len) / 2 ))
+    cols=$(tput cols 2>/dev/null || echo 100)
+    pad=$(( (cols - ${#text}) / 2 ))
 
-  (( pad < 0 )) && pad=0
+    (( pad < 0 )) && pad=0
 
-  printf '%*s%s\n' "$pad" '' "$text"
+    printf '%*s%s\n' "$pad" '' "$text"
 }
 
-placeholder_menu() {
-  local title="$1"
-  clear 2>/dev/null || true
-
-  printf '\033[1;94m'
-  center_line "╔══════════════════════════════════╗"
-  center_line "$(printf '║ %-32s ║' "$title")"
-  center_line "╚══════════════════════════════════╝"
-  printf '\033[0m'
-
-  echo
-  warn "This section is not implemented yet; no fake install actions are shown."
-  pause
-}
-
+# EXTENSION HUB LOGO
 show_logo() {
-  local line
+    local line
 
-  printf '\033[1;94m'
+    printf '\033[1;94m'
 
-  while IFS= read -r line; do
-    center_line "$line"
-  done <<'LOGO'
+    while IFS= read -r line; do
+        center_line "$line"
+    done <<'LOGO'
 ███████╗██╗  ██╗████████╗███████╗███╗   ██╗███████╗██╗ ██████╗ ███╗   ██╗  ██╗  ██╗██╗   ██╗██████╗
 ██╔════╝╚██╗██╔╝╚══██╔══╝██╔════╝████╗  ██║██╔════╝██║██╔═══██╗████╗  ██║  ██║  ██║██║   ██║██╔══██╗
 █████╗   ╚███╔╝    ██║   █████╗  ██╔██╗ ██║███████╗██║██║   ██║██╔██╗ ██║  ███████║██║   ██║██████╔╝
 ██╔══╝   ██╔██╗    ██║   ██╔══╝  ██║╚██╗██║╚════██║██║██║   ██║██║╚██╗██║  ██╔══██║██║   ██║██╔══██╗
 ███████╗██╔╝ ██╗   ██║   ███████╗██║ ╚████║███████║██║╚██████╔╝██║ ╚████║  ██║  ██║╚██████╔╝██████╔╝
-╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
+╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═╝  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
 LOGO
 
-  
-  printf '\033[1;96m'
-  center_line "E X T E N S I O N   H U B"
-  printf '\033[0m'
+    printf '\033[1;96m'
+    center_line "E X T E N S I O N   H U B"
+    printf '\033[0m'
 }
 
 main_menu() {
-  while true; do
-    clear 2>/dev/null || true
+    while true; do
+        clear 2>/dev/null || true
 
-    show_logo
-    echo
+        show_logo
+        echo
 
-    # MANAGER TITLE
-    printf '\033[1;96m'
-    center_line "PTERODACTYL EXTENSION MANAGER"
-    printf '\033[0m'
+        printf '\033[1;96m'
+        center_line "PTERODACTYL EXTENSION MANAGER"
+        printf '\033[0m'
 
-    # TAGLINE
-    printf '\033[1;94m'
-    center_line "Manage • Customize • Extend"
-    printf '\033[0m'
+        printf '\033[1;94m'
+        center_line "Manage • Customize • Extend"
+        printf '\033[0m'
 
-    echo
+        echo
 
-    # INFORMATION BOX
-    printf '\033[1;94m'
-    center_line "╔══════════════════════════════════╗"
-    printf '\033[1;97m'
-    center_line "║  Version       : $APP_VERSION   ║"
-    center_line "║  Made by       : $AUTHOR        ║"
-    center_line "║  Panel Version : 1.x.x          ║"
-    printf '\033[1;94m'
-    center_line "╚══════════════════════════════════╝"
-    printf '\033[0m'
+        # FIXED WIDTH INFORMATION BOX
+        printf '\033[1;94m'
+        center_line "╔══════════════════════════════════╗"
 
-    # COPYRIGHT
-    echo
-    printf '\033[1;90m'
-    center_line "© 2026 Extension Hub"
-    center_line "All Rights Reserved"
-    printf '\033[0m'
+        printf '\033[1;97m'
+        printf -v row '║  Version       : %-16s║' "$APP_VERSION"
+        center_line "$row"
 
-    echo
+        printf -v row '║  Made by       : %-16s║' "$AUTHOR"
+        center_line "$row"
+
+        printf -v row '║  Panel Version : %-16s║' "1.x.x"
+        center_line "$row"
+
+        printf '\033[1;94m'
+        center_line "╚══════════════════════════════════╝"
+        printf '\033[0m'
+
+        echo
+
+        printf '\033[1;90m'
+        center_line "© 2026 Extension Hub"
+        center_line "All Rights Reserved"
+        printf '\033[0m'
+
+        echo
     printf '\033[0m'
     printf '%s%s%s\n' "$C_BOLD$C_CYAN" "MAIN MENU" "$C_RESET"
     echo
