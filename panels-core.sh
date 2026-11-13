@@ -62,7 +62,7 @@ playtely_panel_menu() {
         cat << 'EOF'
  _____  _                     _            _         _ 
 |  __ \| |                   | |          | |       | |
-| |__) | |_ ___ _ __ ___   __| | __ _  ___| |_ _   _| |
+| |__) | |_ ___ _ __ ___   __| | __ _  ___| |_ _   _| | 
 |  ___/| __/ _ \ '__/ _ \ / _` |/ _` |/ __| __| | | | |
 | |    | ||  __/ | | (_) | (_| | (_| | (__| |_| |_| | |
 |_|     \__\___|_|  \___/ \__,_|\__,_|\___|\__|\__, |_|
@@ -94,11 +94,9 @@ EOF
 
         read -r -p " λ Select Option: " p_choice || return
         
-        # SMART LOADING: Try local, then GitHub
         local INSTALLER_SCRIPT="/opt/extension-hub/nexyoncloud-installer.sh"
         
         if [[ ! -f "$INSTALLER_SCRIPT" ]]; then
-            # Fallback to GitHub if not found locally
             INSTALLER_SCRIPT="/tmp/nexyoncloud-installer.sh"
             if [[ ! -f "$INSTALLER_SCRIPT" ]]; then
                 curl -fsSL "https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main/nexyoncloud-installer.sh" -o "$INSTALLER_SCRIPT" 2>/dev/null || true
@@ -108,7 +106,7 @@ EOF
         if [[ -f "$INSTALLER_SCRIPT" ]]; then
             source "$INSTALLER_SCRIPT"
         else
-            warn "NexyonCloud Installer script not found! (Check GitHub repo)"
+            warn "NexyonCloud Installer script not found!"
             pause
             continue
         fi
@@ -116,31 +114,39 @@ EOF
         case "$p_choice" in
             1) 
                 if input_config; then
-                    echo "[1/6] Installing dependencies..."
-                    install_deps
-                    echo "[2/6] Creating database..."
-                    database
-                    echo "[3/6] Installing Pterodactyl..."
-                    panel
-                    echo "[4/6] Configuring NGINX..."
-                    nginx_config
-                    echo "[5/6] Configuring queue + scheduler..."
-                    services
-                    echo "[6/6] Saving credentials..."
-                    save
-                    
-                    echo
+                    install_deps; database; panel; nginx_config; services; save
                     echo "╔══════════════════════════════════════════════╗"
                     echo "║          INSTALLATION COMPLETE               ║"
                     echo "╚══════════════════════════════════════════════╝"
-                    echo
                     echo "Panel: https://$DOMAIN"
-                    echo "Admin: $ADMIN_USER"
-                    echo "Credentials: /root/nexyoncloud-pterodactyl-credentials.txt"
                 fi
                 pause 
                 ;;
-            2) clear; warn "User creation is not implemented yet."; pause ;;
+            2) 
+                # USER MANAGEMENT SCREEN
+                while true; do
+                    clear
+                    echo
+                    echo "════════════════════════════════════════════════════════════"
+                    echo "              PTERODACTYL SERVER MANAGEMENT SYSTEM"
+                    echo "════════════════════════════════════════════════════════════"
+                    echo
+                    echo "  Current Module: USER MANAGEMENT"
+                    echo
+                    echo "────────────────────────────────────────────────────────────"
+                    echo
+                    echo "1) Custom User Create"
+                    echo "2) Auto Create Admin User"
+                    echo
+                    read -r -p "Choose option: " u_choice
+                    
+                    case "$u_choice" in
+                        1) create_user_manual; break ;;
+                        2) create_user_auto; break ;;
+                        *) echo "Invalid option."; sleep 1 ;;
+                    esac
+                done
+                ;;
             3) update_panel; pause ;;
             4) clear; warn "Domain/SSL management coming soon."; pause ;;
             5) uninstall_panel; pause ;;
