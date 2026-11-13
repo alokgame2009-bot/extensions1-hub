@@ -74,13 +74,12 @@ playtely_panel_menu() {
         
         # Pink Logo
         printf "${C_PINK}"
-        cat << 'EOF'
  _____ _______ ______ _____   ____  _____          _____ _________     ___      
 |  __ \__   __|  ____|  __ \ / __ \|  __ \   /\   / ____|__   __\ \   / / |     
 | |__) | | |  | |__  | |__) | |  | | |  | | /  \ | |       | |   \ \_/ /| |     
 |  ___/  | |  |  __| |  _  /| |  | | |  | |/ /\ \| |       | |    \   / | |     
 | |      | |  | |____| | \ \| |__| | |__| / ____ \ |____   | |     | |  | |____ 
-|_|      |_|  |______|_|  \_\\____/|_____/_/    \_\_____|  |_|     |_|  |______|                                                                               
+|_|      |_|  |______|_|  \_\\____/|_____/_/    \_\_____|  |_|     |_|  |______|                                                                                 
 EOF
         printf "${C_RESET}\n"
 
@@ -109,45 +108,39 @@ EOF
 
         read -r -p " λ Select Option: " p_choice || return
         
-        # Yahan hum aapke diye hue NexyonCloud Installer ko call kar rahe hain
         local INSTALLER_SCRIPT="/opt/extension-hub/nexyoncloud-installer.sh"
         
-        if [[ ! -f "$INSTALLER_SCRIPT" ]]; then
-            # Fallback to fetch from GitHub if not found locally
-            INSTALLER_SCRIPT="/tmp/nexyoncloud-installer.sh"
-            if [[ ! -f "$INSTALLER_SCRIPT" ]]; then
-                curl -fsSL "https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main/nexyoncloud-installer.sh" -o "$INSTALLER_SCRIPT" 2>/dev/null || true
-            fi
+        # Source the installer script so we can call its functions directly
+        if [[ -f "$INSTALLER_SCRIPT" ]]; then
+            source "$INSTALLER_SCRIPT"
+        else
+            warn "NexyonCloud Installer script not found!"
+            pause
+            continue
         fi
 
         case "$p_choice" in
             1) 
-                if [[ -f "$INSTALLER_SCRIPT" ]]; then
-                    bash "$INSTALLER_SCRIPT"
-                else
-                    warn "NexyonCloud Installer script not found!"
-                fi
+                # Direct call to install function
+                install_panel
                 pause 
                 ;;
-            2) clear; warn "User creation is not implemented yet."; pause ;;
+            2) 
+                clear; warn "User creation is not implemented yet."; pause ;;
             3) 
-                if [[ -f "$INSTALLER_SCRIPT" ]]; then
-                     bash "$INSTALLER_SCRIPT" --update 2>/dev/null || bash "$INSTALLER_SCRIPT"
-                else
-                    warn "Update script not found."
-                fi
+                # Direct call to update function
+                update_panel
                 pause 
                 ;;
-            4) clear; warn "Domain/SSL management coming soon."; pause ;;
+            4) 
+                clear; warn "Domain/SSL management coming soon."; pause ;;
             5) 
-                if [[ -f "$INSTALLER_SCRIPT" ]]; then
-                     bash "$INSTALLER_SCRIPT" --uninstall 2>/dev/null || bash "$INSTALLER_SCRIPT"
-                else
-                    warn "Uninstall script not found."
-                fi
+                # Direct call to uninstall function
+                uninstall_panel
                 pause 
                 ;;
-            6) clear; warn "phpmyadmin setup coming soon."; pause ;;
+            6) 
+                clear; warn "phpmyadmin setup coming soon."; pause ;;
             0) return ;;
             *) warn "Invalid option."; sleep 1 ;;
         esac
