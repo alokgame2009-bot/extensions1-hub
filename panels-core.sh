@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # panels-core.sh - Pterodactyl Panel Manager UI
 
-# Fallback Colors (Agar main file mein na ho toh bhi kaam kare)
-C_PINK="${C_PINK:-$'\033[38;5;213m'}"
+# Force fix for unbound variable error in strict mode
+C_PINK=$'\033[38;5;213m'
+
+# Fallback Colors for safety
 C_RESET="${C_RESET:-$'\033[0m'}"
 C_BOLD="${C_BOLD:-$'\033[1m'}"
 C_DIM="${C_DIM:-$'\033[2m'}"
