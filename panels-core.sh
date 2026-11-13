@@ -56,8 +56,11 @@ playtely_panel_menu() {
     while true; do
         clear 2>/dev/null || true
         
+        # Define fallback for C_PINK if not set in main environment
+        local CP=${C_PINK:-$C_CYAN}
+        
         # Pink Logo
-        printf "${C_PINK}"
+        printf "${CP}"
         cat << 'EOF'
 ██████╗ ██╗      █████╗ ██╗   ██╗████████╗███████╗██╗  ██╗   ██╗
 ██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔════╝██║  ██║   ██║
