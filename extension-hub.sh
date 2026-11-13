@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v6.5 - Main UI & Router (Fixed Blueprint)
+# Extension Hub v7.0 - Main UI & Router (Extensions Grid Added)
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v6.5"
+APP_VERSION="v7.0"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -112,25 +112,159 @@ blueprint_info() {
 }
 
 # ==========================================
+# EXTENSIONS GRID MENU (Screenshot 1 & 2)
+# ==========================================
+playtely_extensions_menu() {
+    # List of 65 Extensions based on your screenshot
+    local extensions=(
+        "1|adminauditlogs" "2|huxregister" "3|loader" "4|lyrdyannounce"
+        "5|mclogs" "6|mcplugins" "7|mctools" "8|minecraftplayermanager"
+        "9|playerlisting" "10|resourcealerts" "11|resourcemanager" "12|serverbackgrounds"
+        "13|serversplitter" "14|simplefavicons" "15|snowflakes" "16|sociallogin"
+        "17|startupchanger" "18|subdomains" "19|tawkto" "20|versionchanger"
+        "21|pteromonaco" "22|urldownloader" "23|consolelogs" "24|laravellogs"
+        "25|vanillatweaks" "26|modrinthbrowser" "27|nopagination" "28|activitypurges"
+        "29|redirect" "30|simplefooters" "31|paneladdressoverride" "32|shownodeids"
+        "33|votifiertester" "34|sidebar" "35|translations" "36|monacoeditor"
+        "37|minecraftpluginmanager" "38|subdomainmanager" "39|serverimporter" "40|pstatistics"
+        "41|pullfiles" "42|serverpropsmanager" "43|motdmaker" "44|servericonimporter"
+        "45|sagaautosuspension" "46|sagaminecraftmodpackin" "47|blueannouncements" "48|trashbin"
+        "49|eggchanger" "50|mysqlautobackup" "51|configeditor" "52|customserversort"
+        "53|databaseimportexport" "54|minecraftmodmanager" "55|serverid" "56|stats"
+        "57|vminfo" "58|customcss" "59|autobackups" "60|node"
+        "61|mcp" "62|mcplayer" "63|pterodactylramburst" "64|pterodactylpanelban"
+        "65|pterodactylupburst"
+    )
+
+    declare -a selected_extensions=()
+
+    while true; do
+        clear 2>/dev/null || true
+        
+        # Header Box
+        printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
+        printf "${C_CYAN}║${C_RESET}                     ${C_PINK}Nobita.dev CONTROL HUB${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
+        printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+
+        # Grid Layout (2 Columns)
+        local half=$(( (${#extensions[@]} + 1) / 2 ))
+        for ((i=0; i<half; i++)); do
+            IFS='|' read -r id1 name1 <<< "${extensions[$i]}"
+            local right_index=$((i + half))
+            
+            # Check if selected
+            local sel1="[-]"; local col1="${C_GRAY}"
+            for s in "${selected_extensions[@]}"; do [[ "$s" == "$id1" ]] && sel1="[+]" && col1="${C_GREEN}"; done
+            
+            # Print Left Column
+            printf " ${col1}%s${C_RESET} ${C_WHITE}%-2s${C_RESET} ${C_DIM}%-25s${C_RESET}" "$sel1" "$id1" "$name1"
+            
+            # Print Right Column
+            if [ "$right_index" -lt "${#extensions[@]}" ]; then
+                IFS='|' read -r id2 name2 <<< "${extensions[$right_index]}"
+                local sel2="[-]"; local col2="${C_GRAY}"
+                for s in "${selected_extensions[@]}"; do [[ "$s" == "$id2" ]] && sel2="[+]" && col2="${C_GREEN}"; done
+                printf "   ${col2}%s${C_RESET} ${C_WHITE}%-2s${C_RESET} ${C_DIM}%-25s${C_RESET}" "$sel2" "$id2" "$name2"
+            fi
+            echo ""
+        done
+        echo ""
+
+        # Footer / Actions
+        printf " ${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 70))"
+        printf " ${C_WHITE}SELECTED: ${C_YELLOW}%d${C_WHITE} items${C_RESET}\n" "${#selected_extensions[@]}"
+        
+        printf " ${C_GREEN}[1] Install  ${C_RED}[r] Remove  ${C_BLUE}[a] Select All  ${C_WHITE}[c] Clear  ${C_RED}[0] Exit${C_RESET}\n\n"
+        
+        read -r -p " 👉 ${C_GREEN}Select ID(s) or Action:${C_RESET} " input
+        
+        case "$input" in
+            0|"exit")
+                return
+                ;;
+            "a"|"A")
+                selected_extensions=()
+                for ext in "${extensions[@]}"; do
+                    IFS='|' read -r id _ <<< "$ext"
+                    selected_extensions+=("$id")
+                done
+                ;;
+            "c"|"C")
+                selected_extensions=()
+                ;;
+            "1")
+                if [ ${#selected_extensions[@]} -eq 0 ]; then
+                    echo -e "\n${C_RED}Error: No extensions selected!${C_RESET}"
+                    sleep 1
+                else
+                    echo -e "\n${C_GREEN}Installing extensions: ${selected_extensions[*]}${C_RESET}"
+                    # Yahan aapki real extension install command aayegi
+                    sleep 2
+                    echo -e "${C_GREEN}Done!${C_RESET}"
+                    pause
+                fi
+                ;;
+            "r"|"R")
+                if [ ${#selected_extensions[@]} -eq 0 ]; then
+                    echo -e "\n${C_RED}Error: No extensions selected!${C_RESET}"
+                    sleep 1
+                else
+                    echo -e "\n${C_RED}Removing extensions: ${selected_extensions[*]}${C_RESET}"
+                    # Yahan aapki real extension remove command aayegi
+                    sleep 2
+                    echo -e "${C_GREEN}Done!${C_RESET}"
+                    pause
+                fi
+                ;;
+            *)
+                # Handle multiple IDs input (e.g., "1 5 12")
+                for num in $input; do
+                    local found=0
+                    for ext in "${extensions[@]}"; do
+                        IFS='|' read -r id _ <<< "$ext"
+                        if [ "$id" == "$num" ]; then
+                            found=1
+                            # Toggle Selection
+                            local exists=0
+                            for s in "${selected_extensions[@]}"; do [[ "$s" == "$num" ]] && exists=1; done
+                            
+                            if [ "$exists" -eq 0 ]; then
+                                selected_extensions+=("$num")
+                            else
+                                local new_sel=()
+                                for s in "${selected_extensions[@]}"; do [[ "$s" != "$num" ]] && new_sel+=("$s"); done
+                                selected_extensions=("${new_sel[@]}")
+                            fi
+                            break
+                        fi
+                    done
+                    if [ "$found" -eq 0 ]; then
+                        echo -e "\n${C_RED}Invalid ID: $num${C_RESET}"
+                        sleep 1
+                    fi
+                done
+                ;;
+        esac
+    done
+}
+
+# ==========================================
 # THEME MENU (Embedded Directly)
 # ==========================================
 playtely_theme_menu() {
     while true; do
         clear 2>/dev/null || true
         
-        # Top Box (Cyan Border, Pink Text)
         printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
         printf "${C_CYAN}║${C_RESET}                       ${C_PINK}CONTROL PANEL UI${C_RESET}                       ${C_CYAN}║${C_RESET}\n"
         printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
         
-        # Status
         if detect_blueprint; then
             printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
         else
             printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}○ OFFLINE${C_RESET}\n\n"
         fi
         
-        # Menu Options
         printf "  ${C_GREEN}[1]${C_RESET} ${C_CYAN}Blueprint${C_RESET}\n"
         printf "  ${C_GREEN}[2]${C_RESET} ${C_CYAN}Theme${C_RESET}\n"
         printf "  ${C_GREEN}[3]${C_RESET} ${C_CYAN}Extensions${C_RESET}\n\n"
@@ -140,7 +274,6 @@ playtely_theme_menu() {
         
         case "$t_choice" in
             1) 
-                # BLUEPRINT SUB-MENU
                 while true; do
                     clear 2>/dev/null || true
                     printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
@@ -183,7 +316,7 @@ playtely_theme_menu() {
                 done
                 ;;
             2) clear; printf "  ${C_CYAN}--- Theme Management ---${C_RESET}\n\n"; warn "Theme manager coming soon."; pause ;;
-            3) clear; printf "  ${C_CYAN}--- Extensions ---${C_RESET}\n\n"; warn "Extensions manager coming soon."; pause ;;
+            3) playtely_extensions_menu ;; # <--- Extensions Grid Call
             0) return ;;
             *) warn "Invalid option."; sleep 1 ;;
         esac
