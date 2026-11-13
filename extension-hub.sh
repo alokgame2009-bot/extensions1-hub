@@ -55,7 +55,7 @@ load_modules() {
 }
 
 # ==========================================
-# THEME MENU (Embedded Here)
+# THEME MENU (Embedded Directly)
 # ==========================================
 playtely_theme_menu() {
     while true; do
@@ -84,24 +84,9 @@ playtely_theme_menu() {
         read -r -p " ${C_GREEN}▶ Select Option :${C_RESET} " t_choice || return
         
         case "$t_choice" in
-            1) 
-                clear
-                printf "  ${C_CYAN}--- Blueprint Management ---${C_RESET}\n\n"
-                warn "Blueprint installation is handled from Panel -> [1] Pterodactyl v1 -> [1] Install."
-                pause 
-                ;;
-            2) 
-                clear
-                printf "  ${C_CYAN}--- Theme Management ---${C_RESET}\n\n"
-                warn "Theme manager coming soon."
-                pause 
-                ;;
-            3) 
-                clear
-                printf "  ${C_CYAN}--- Extensions ---${C_RESET}\n\n"
-                warn "Extensions manager coming soon."
-                pause 
-                ;;
+            1) clear; printf "  ${C_CYAN}--- Blueprint Management ---${C_RESET}\n\n"; warn "Blueprint installation is handled from Panel -> [1] Pterodactyl v1 -> [1] Install."; pause ;;
+            2) clear; printf "  ${C_CYAN}--- Theme Management ---${C_RESET}\n\n"; warn "Theme manager coming soon."; pause ;;
+            3) clear; printf "  ${C_CYAN}--- Extensions ---${C_RESET}\n\n"; warn "Extensions manager coming soon."; pause ;;
             0) return ;;
             *) warn "Invalid option."; sleep 1 ;;
         esac
@@ -209,7 +194,10 @@ main_menu() {
             1) menu_panel ;;
             2) menu_wings ;;
             3) menu_toolbox ;;
-            4) playtely_theme_menu ;; # <--- Yahan Theme Menu Call Ho Raha Hai
+            4) 
+                # Yahan Theme menu direct call ho raha hai
+                playtely_theme_menu 
+                ;;
             5) menu_system ;;
             6) menu_container ;;
             7) menu_backup ;;
