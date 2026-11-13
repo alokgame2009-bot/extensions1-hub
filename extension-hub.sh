@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Extension Hub v3.0 - Logo + Perfect Photo 2 UI
+# Extension Hub v4.0 - Premium UI (Top Bar + 3D Logo + Grid Menu)
 # Made by Ziro | Powered by NexyonCloud
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v3.0"
+APP_VERSION="v4.0"
 AUTHOR="Ziro"
 PANEL_DIR="${PTERODACTYL_DIRECTORY:-/var/www/pterodactyl}"
 BLUEPRINT_RELEASE_URL="https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip"
@@ -20,9 +20,10 @@ if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
   C_GREEN=$'\033[38;5;82m'; C_YELLOW=$'\033[38;5;220m'
   C_RED=$'\033[38;5;203m'; C_WHITE=$'\033[97m'
   C_PURPLE=$'\033[38;5;135m'; C_PINK=$'\033[38;5;213m'
+  C_GRAY=$'\033[38;5;240m'
 else
   C_RESET=""; C_BOLD=""; C_DIM=""; C_CYAN=""; C_BLUE=""
-  C_GREEN=""; C_YELLOW=""; C_RED=""; C_WHITE=""; C_PURPLE=""; C_PINK=""
+  C_GREEN=""; C_YELLOW=""; C_RED=""; C_WHITE=""; C_PURPLE=""; C_PINK=""; C_GRAY=""
 fi
 
 # ---------- cleanup ----------
@@ -63,6 +64,15 @@ get_ram_usage() {
 get_network_status() {
     if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}● CONNECTED${C_RESET}"; else printf "${C_RED}● DISCONNECTED${C_RESET}"; fi
 }
+get_uptime() {
+    uptime -p 2>/dev/null | sed 's/up //' || echo "Unknown"
+}
+get_disk_usage() {
+    df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"
+}
+get_current_user() {
+    echo "${USER:-root}"
+}
 
 # ==========================================
 # UI & DISPLAY
@@ -78,32 +88,53 @@ center_line() {
     printf "%${padding}s%s\n" "" "$text"
 }
 
+# Draw Top Bar (User, Uptime, Disk, RAM, CPU)
+draw_top_bar() {
+    local user=$(get_current_user)
+    local up=$(get_uptime)
+    local disk=$(get_disk_usage)
+    local ram=$(get_ram_usage)
+    local cpu=$(get_cpu_usage)
+    
+    printf "  ${C_CYAN} %s${C_RESET}   " "$user"
+    printf "${C_GRAY}│${C_RESET}   ${C_YELLOW} %s${C_RESET}   " "$up"
+    printf "${C_GRAY}│${C_RESET}   ${C_PURPLE} %s${C_RESET}   " "$disk"
+    printf "${C_GRAY}│${C_RESET}   ${C_RED} RAM: %s%%${C_RESET}   " "$ram"
+    printf "${C_GRAY}│${C_RESET}   ${C_GREEN}CPU: %s%%${C_RESET}\n" "$cpu"
+}
+
+# Draw EXTENSION HUB 3D Logo
 show_logo() {
     local line
     printf "${C_BLUE}"
     while IFS= read -r line; do
         center_line "$line"
     done <<'LOGO'
-███████╗██╗  ██╗████████╗███████╗███╗   ██╗███████╗██╗ ██████╗ ███╗   ██╗  ██╗  ██╗██╗   ██╗██████╗
-██╔════╝╚██╗██╔╝╚══██╔══╝██╔════╝████╗  ██║██╔════╝██║██╔═══██╗████╗  ██║  ██║  ██║██║   ██║██╔══██╗
-█████╗   ╚███╔╝    ██║   █████╗  ██╔██╗ ██║███████╗██║██║   ██║██╔██╗ ██║  ███████║██║   ██║██████╔╝
-██╔══╝   ██╔██╗    ██║   ██╔══╝  ██║╚██╗██║╚════██║██║██║   ██║██║╚██╗██║  ██╔══██║██║   ██║██╔══██╗
-███████╗██╔╝ ██╗   ██║   ███████╗██║ ╚████║███████║██║╚██████╔╝██║ ╚████║  ██║  ██║╚██████╔╝██████╔╝
-╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
+███████╗██╗  ██╗████████╗███████╗███╗   ██╗███████╗██╗ ██████╗ ███╗   ██╗    ██╗  ██╗██╗   ██╗██████╗ 
+██╔════╝╚██╗██╔╝╚══██╔══╝██╔════╝████╗  ██║██╔════╝██║██╔═══██╗████╗  ██║    ██║  ██║██║   ██║██╔══██╗
+█████╗   ╚███╔╝    ██║   █████╗  ██╔██╗ ██║███████╗██║██║   ██║██╔██╗ ██║    ███████║██║   ██║██████╔╝
+██╔══╝   ██╔██╗    ██║   ██╔══╝  ██║╚██╗██║╚════██║██║██║   ██║██║╚██╗██║    ██╔══██║██║   ██║██╔══██╗
+███████╗██╔╝ ██╗   ██║   ███████╗██║ ╚████║███████║██║╚██████╔╝██║ ╚████║    ██║  ██║╚██████╔╝██████╔╝
+╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ 
 LOGO
     printf "${C_RESET}\n"
+    center_line "${C_PURPLE}Z I R O   E D I T I O N   —   O B S I D I A N   N E X T   G E N${C_RESET}"
+    center_line "${C_GRAY}Powered by NexyonCloud${C_RESET}"
+    echo ""
 }
 
 draw_ui() {
     clear 2>/dev/null || true
-    show_logo
-    echo ""
-    local cols=$(tput cols 2>/dev/null || echo 80)
     
-    # Top separator
+    # Top Bar
+    draw_top_bar
+    local cols=$(tput cols 2>/dev/null || echo 80)
     printf "${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 $cols))"
     
-    # System Status Section
+    # Logo
+    show_logo
+
+    # System Status
     printf " ${C_WHITE}●${C_RESET} ${C_BOLD}SYSTEM STATUS${C_RESET}\n"
     printf "   ${C_DIM}CPU Usage:${C_RESET} ${C_CYAN}%s%%${C_RESET}     " "$(get_cpu_usage)"
     printf "${C_DIM}RAM Usage:${C_RESET} ${C_CYAN}%s%%${C_RESET}     " "$(get_ram_usage)"
