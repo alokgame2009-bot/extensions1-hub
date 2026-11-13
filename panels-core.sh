@@ -62,7 +62,7 @@ playtely_panel_menu() {
         cat << 'EOF'
  _____  _                     _            _         _ 
 |  __ \| |                   | |          | |       | |
-| |__) | |_ ___ _ __ ___   __| | __ _  ___| |_ _   _| | 
+| |__) | |_ ___ _ __ ___   __| | __ _  ___| |_ _   _| |
 |  ___/| __/ _ \ '__/ _ \ / _` |/ _` |/ __| __| | | | |
 | |    | ||  __/ | | (_) | (_| | (_| | (__| |_| |_| | |
 |_|     \__\___|_|  \___/ \__,_|\__,_|\___|\__|\__, |_|
@@ -115,35 +115,48 @@ EOF
             1) 
                 if input_config; then
                     install_deps; database; panel; nginx_config; services; save
-                    echo "╔══════════════════════════════════════════════╗"
-                    echo "║          INSTALLATION COMPLETE               ║"
-                    echo "╚══════════════════════════════════════════════╝"
-                    echo "Panel: https://$DOMAIN"
+                    printf "\n${C_GREEN}╔══════════════════════════════════════════════╗${C_RESET}\n"
+                    printf "${C_GREEN}║          INSTALLATION COMPLETE               ║${C_RESET}\n"
+                    printf "${C_GREEN}╚══════════════════════════════════════════════╝${C_RESET}\n"
+                    printf "${C_WHITE}Panel: ${C_CYAN}https://$DOMAIN${C_RESET}\n"
                 fi
                 pause 
                 ;;
             2) 
-                # USER MANAGEMENT SCREEN
+                # PREMIUM USER MANAGEMENT MENU
                 while true; do
                     clear
-                    echo
-                    echo "════════════════════════════════════════════════════════════"
-                    echo "              PTERODACTYL SERVER MANAGEMENT SYSTEM"
-                    echo "════════════════════════════════════════════════════════════"
-                    echo
-                    echo "  Current Module: USER MANAGEMENT"
-                    echo
-                    echo "────────────────────────────────────────────────────────────"
-                    echo
-                    echo "1) Custom User Create"
-                    echo "2) Auto Create Admin User"
-                    echo
-                    read -r -p "Choose option: " u_choice
+                    local cols=$(tput cols 2>/dev/null || echo 80)
+                    printf "${C_CYAN}╔══════════════════════════════════════════════════════════════════════╗${C_RESET}\n"
+                    printf "${C_CYAN}║${C_RESET} ${C_WHITE}❖${C_RESET} ${C_BOLD}PTERODACTYL SERVER MANAGEMENT SYSTEM${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
+                    printf "${C_CYAN}╚══════════════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+                    
+                    printf " ${C_YELLOW}▶${C_RESET} ${C_BOLD}Current Module:${C_RESET} ${C_YELLOW}USER MANAGEMENT${C_RESET}\n"
+                    printf " ${C_BLUE}%s${C_RESET}\n\n" "$(printf '─%.0s' $(seq 1 60))"
+                    
+                    printf "${C_CYAN}::${C_RESET} ${C_BOLD}AVAILABLE ACTIONS${C_RESET}\n\n"
+                    printf "  ${C_GREEN}[1]${C_RESET} ${C_WHITE}Custom User Create${C_RESET}\n"
+                    printf "  ${C_GREEN}[2]${C_RESET} ${C_WHITE}Auto Create Admin User${C_RESET}\n"
+                    printf "  ${C_RED}[0]${C_RESET} ${C_WHITE}Back to Panel Menu${C_RESET}\n\n"
+                    printf " ${C_BLUE}%s${C_RESET}\n\n" "$(printf '─%.0s' $(seq 1 60))"
+                    
+                    read -r -p " λ Choose option: " u_choice
                     
                     case "$u_choice" in
-                        1) create_user_manual; break ;;
-                        2) create_user_auto; break ;;
-                        *) echo "Invalid option."; sleep 1 ;;
+                        1) 
+                            printf "\n ${C_YELLOW}[ ⏳ ]${C_RESET} Launching manual user creation...\n"
+                            sleep 1
+                            create_user_manual
+                            break 
+                            ;;
+                        2) 
+                            printf "\n ${C_YELLOW}[ ⏳ ]${C_RESET} Launching auto admin creation...\n"
+                            sleep 1
+                            create_user_auto
+                            break 
+                            ;;
+                        0) break ;;
+                        *) warn "Invalid option."; sleep 1 ;;
                     esac
                 done
                 ;;
