@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Extension Hub v2.5 - Full UI (Logo + Photo 2 Style)
+# Extension Hub v3.0 - Logo + Perfect Photo 2 UI
 # Made by Ziro | Powered by NexyonCloud
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v2.5"
+APP_VERSION="v3.0"
 AUTHOR="Ziro"
 PANEL_DIR="${PTERODACTYL_DIRECTORY:-/var/www/pterodactyl}"
 BLUEPRINT_RELEASE_URL="https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip"
