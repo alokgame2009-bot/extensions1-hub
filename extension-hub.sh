@@ -120,7 +120,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (FAST VERSION)
+# EXTENSIONS GRID MENU (FAST - Filesystem Only)
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -144,25 +144,6 @@ playtely_extensions_menu() {
     )
     declare -a selected_extensions=()
 
-    # Ensure file exists
-    local installed_list="/tmp/installed_extensions.cache"
-    touch "$installed_list"
-
-    if [[ -d "$PANEL_DIR" ]]; then
-        info "Loading installed extensions list..."
-        (cd "$PANEL_DIR" && php artisan tinker --execute="
-            try {
-                if (Schema::hasTable('extensions')) {
-                    echo DB::table('extensions')->pluck('name')->implode(PHP_EOL);
-                } elseif (Schema::hasTable('blueprint_extensions')) {
-                    echo DB::table('blueprint_extensions')->pluck('name')->implode(PHP_EOL);
-                }
-            } catch(\Exception \$e) {}
-        " 2>/dev/null) >> "$installed_list" || true
-        ls -1 "$PANEL_DIR/extensions/" 2>/dev/null >> "$installed_list" || true
-        ls -1 "$PANEL_DIR/app/Extensions/" 2>/dev/null >> "$installed_list" || true
-    fi
-
     while true; do
         clear 2>/dev/null || true
         printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
@@ -173,21 +154,42 @@ playtely_extensions_menu() {
         for ((i=0; i<half; i++)); do
             IFS='|' read -r id1 name1 <<< "${extensions[$i]}"
             local right_index=$((i + half))
+            
+            # Left Column
             local sel1="[-]"; local col1="${C_GRAY}"
             for s in "${selected_extensions[@]}"; do 
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
+            
+            # Fast Filesystem Check
             local status1="○"; local status_col1="${C_RED}"
-            if grep -qi "^${name1}$" "$installed_list" 2>/dev/null; then status1="●"; status_col1="${C_GREEN}"; fi
+            if [[ -d "$PANEL_DIR/extensions/$name1" ]] || \
+               [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]] || \
+               [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || \
+               [[ -f "$PANEL_DIR/app/Extensions/$name1.php" ]] || \
+               [[ -d "$PANEL_DIR/.blueprint/extensions/$name1" ]]; then
+                status1="●"; status_col1="${C_GREEN}"
+            fi
+            
             printf " ${col1}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col1}%s${C_RESET}" "$sel1" "$id1" "$name1" "$status1"
+            
+            # Right Column
             if [ "$right_index" -lt "${#extensions[@]}" ]; then
                 IFS='|' read -r id2 name2 <<< "${extensions[$right_index]}"
                 local sel2="[-]"; local col2="${C_GRAY}"
                 for s in "${selected_extensions[@]}"; do 
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
+                
                 local status2="○"; local status_col2="${C_RED}"
-                if grep -qi "^${name2}$" "$installed_list" 2>/dev/null; then status2="●"; status_col2="${C_GREEN}"; fi
+                if [[ -d "$PANEL_DIR/extensions/$name2" ]] || \
+                   [[ -f "$PANEL_DIR/extensions/$name2.blueprint" ]] || \
+                   [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || \
+                   [[ -f "$PANEL_DIR/app/Extensions/$name2.php" ]] || \
+                   [[ -d "$PANEL_DIR/.blueprint/extensions/$name2" ]]; then
+                    status2="●"; status_col2="${C_GREEN}"
+                fi
+                
                 printf "   ${col2}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col2}%s${C_RESET}" "$sel2" "$id2" "$name2" "$status2"
             fi
             echo ""
@@ -200,10 +202,7 @@ playtely_extensions_menu() {
         read -r -p " 👉 ${C_GREEN}Select ID(s) or Action:${C_RESET} " input
 
         case "$input" in
-            0|"exit") 
-                rm -f "$installed_list"
-                return 
-                ;;
+            0|"exit") return ;;
             "a"|"A") selected_extensions=(); for ext in "${extensions[@]}"; do IFS='|' read -r id _ <<< "$ext"; selected_extensions+=("$id"); done ;;
             "c"|"C") selected_extensions=() ;;
             "i"|"I")
@@ -215,10 +214,7 @@ playtely_extensions_menu() {
                             if [ "$id" == "$sel" ]; then install_ext "$id" "$name" || true; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; 
-                    rm -f "$installed_list"
-                    pause
-                    break
+                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
                 fi
                 ;;
             "r"|"R")
@@ -230,10 +226,7 @@ playtely_extensions_menu() {
                             if [ "$id" == "$sel" ]; then remove_ext "$id" "$name" || true; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; 
-                    rm -f "$installed_list"
-                    pause
-                    break
+                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
                 fi
                 ;;
             *)
