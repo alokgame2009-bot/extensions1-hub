@@ -41,6 +41,38 @@ pause() { echo; read -r -p "Press Enter to continue..." _ || true; }
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 need_root() { [[ "$EUID" -eq 0 ]] || { err "Run as root."; return 1; }; }
 valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/composer.json" ]]; }
+
+# Run this before/after Blueprint operations. Laravel can print provider/container
+# exceptions even when a surrounding shell command continues; never hide those errors.
+panel_artisan_health_check() {
+    valid_panel_dir || { err "Invalid Pterodactyl panel directory: $PANEL_DIR"; return 1; }
+    command_exists php || { err "PHP CLI is not installed or not in PATH."; return 1; }
+
+    local check_log status
+    check_log="$(mktemp /tmp/extension-hub-artisan-check.XXXXXX.log)"
+    if (cd "$PANEL_DIR" && php artisan list --no-ansi) >"$check_log" 2>&1; then
+        status=0
+    else
+        status=$?
+    fi
+
+    if [[ "$status" -ne 0 ]] || grep -Eqi 'Target class .* does not exist|Class .* does not exist|ReflectionException|BindingResolutionException' "$check_log"; then
+        err "Pterodactyl Laravel bootstrap check failed. Blueprint operations are stopped to prevent misleading install-success messages."
+        if grep -Eqi 'TrashBinRepository|sagatrashbin' "$check_log"; then
+            warn "Detected the existing sagatrashbin / TrashBinRepository provider error."
+            warn "This is a broken or incomplete installed extension, not an error in sagaautosuspension itself."
+        fi
+        echo
+        sed -n '1,35p' "$check_log"
+        echo
+        warn "Full diagnostic: $check_log"
+        warn "Fix/remove the extension whose provider references the missing class, then rerun the install."
+        return 1
+    fi
+
+    rm -f "$check_log"
+    return 0
+}
 detect_blueprint() {
     valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]] &&
     { [[ -x /usr/local/bin/blueprint ]] || command_exists blueprint; }
@@ -71,12 +103,27 @@ get_current_user() { echo "${USER:-root}"; }
 install_blueprint() {
     need_root || return 1
     valid_panel_dir || { err "Pterodactyl panel not found: $PANEL_DIR"; return 1; }
+    panel_artisan_health_check || return 1
     if detect_blueprint; then
         warn "Blueprint is already installed."
         read -r -p "Run Blueprint repair/setup again? [y/N]: " repair_answer
         [[ "$repair_answer" =~ ^[Yy]$ ]] || return 0
-        (cd "$PANEL_DIR" && blueprint -rerun-install)
-        return $?
+        local repair_log repair_status
+        repair_log="$(mktemp /tmp/extension-hub-blueprint-repair.XXXXXX.log)"
+        if (cd "$PANEL_DIR" && blueprint -rerun-install) >"$repair_log" 2>&1; then
+            repair_status=0
+        else
+            repair_status=$?
+        fi
+        cat "$repair_log"
+        if [[ "$repair_status" -ne 0 ]] || grep -Eqi 'Target class .* does not exist|Class .* does not exist|ReflectionException|BindingResolutionException' "$repair_log"; then
+            err "Blueprint repair did not complete cleanly. See: $repair_log"
+            return 1
+        fi
+        panel_artisan_health_check || { err "Laravel health check failed after Blueprint repair."; warn "Repair log: $repair_log"; return 1; }
+        rm -f "$repair_log"
+        ok "Blueprint repair completed and Laravel health check passed."
+        return 0
     fi
     command_exists apt-get || { err "Debian/Ubuntu apt-get is required."; return 1; }
     warn "Blueprint will modify panel files: $PANEL_DIR"
@@ -92,7 +139,7 @@ install_blueprint() {
     install -d -m 0755 /etc/apt/keyrings
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg
     chmod 0644 /etc/apt/keyrings/nodesource.gpg
-    printf '%s\\n' 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
+    printf '%s\n' 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
     apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
     command_exists node && command_exists npm || { err "Node.js/npm installation failed."; return 1; }
@@ -121,7 +168,20 @@ BLUEPRINT_RC
     fi
     chmod +x "$PANEL_DIR/blueprint.sh"
     info "Running official Blueprint setup..."
-    (cd "$PANEL_DIR" && bash ./blueprint.sh)
+    local setup_log setup_status
+    setup_log="$(mktemp /tmp/extension-hub-blueprint-setup.XXXXXX.log)"
+    if (cd "$PANEL_DIR" && bash ./blueprint.sh) >"$setup_log" 2>&1; then
+        setup_status=0
+    else
+        setup_status=$?
+    fi
+    cat "$setup_log"
+    if [[ "$setup_status" -ne 0 ]] || grep -Eqi 'Target class .* does not exist|Class .* does not exist|ReflectionException|BindingResolutionException' "$setup_log"; then
+        err "Blueprint setup did not complete cleanly. See: $setup_log"
+        return 1
+    fi
+    panel_artisan_health_check || { err "Blueprint setup ran, but Laravel health verification failed."; warn "Setup log: $setup_log"; return 1; }
+    rm -f "$setup_log"
     if [[ -x /usr/local/bin/blueprint ]] || command_exists blueprint; then
         ok "Blueprint CLI installed."
         blueprint -version || true
@@ -135,32 +195,67 @@ BLUEPRINT_RC
 # REAL EXTENSION LOGIC
 # ==========================================
 install_ext() {
-    local ext_id="$1" ext_name="$2" tmp_file package_file
+    local ext_id="$1" ext_name="$2" package_file download_tmp install_log status
     need_root || return 1
     valid_panel_dir || { err "Panel directory not found: $PANEL_DIR"; return 1; }
     command_exists blueprint || { err "Install Blueprint first."; return 1; }
 
+    # Detect broken pre-existing Laravel providers before running Blueprint.
+    panel_artisan_health_check || return 1
+
     package_file="$PANEL_DIR/${ext_name}.blueprint"
-    [[ ! -e "$package_file" ]] || { err "Package already exists: $package_file"; return 1; }
-    tmp_file="$(mktemp "$PANEL_DIR/.extension-download-XXXXXX")"
+    download_tmp="$(mktemp "$PANEL_DIR/.${ext_name}.download.XXXXXX")"
+    install_log="$(mktemp "/tmp/extension-hub-${ext_name}.XXXXXX.log")"
 
     info "Downloading ${ext_name}.blueprint..."
-    if ! curl -fL --retry 3 --retry-delay 2 "${EXT_GITHUB_RAW}/${ext_name}.blueprint" -o "$tmp_file"; then
-        rm -f "$tmp_file"
-        err "Extension download failed; verify that the package exists in the GitHub extensions folder."
+    if ! curl -fL --retry 3 --retry-delay 2 \
+        "${EXT_GITHUB_RAW}/${ext_name}.blueprint" -o "$download_tmp"; then
+        rm -f "$download_tmp" "$install_log"
+        err "Download failed. Check that ${ext_name}.blueprint exists in the repository."
         return 1
     fi
 
-    mv "$tmp_file" "$package_file"
-    info "Installing with the official Blueprint CLI..."
-    if (cd "$PANEL_DIR" && blueprint -install "${ext_name}.blueprint"); then
-        rm -f "$package_file"
-        ok "Installed $ext_name."
-        return 0
+    if [[ ! -s "$download_tmp" ]] || ! unzip -tq "$download_tmp" >/dev/null 2>&1; then
+        rm -f "$download_tmp" "$install_log"
+        err "Downloaded extension is empty or is not a valid Blueprint ZIP package."
+        return 1
+    fi
+
+    if [[ -e "$package_file" ]]; then
+        rm -f "$download_tmp" "$install_log"
+        err "Refusing to overwrite existing package: $package_file"
+        return 1
+    fi
+
+    mv "$download_tmp" "$package_file"
+    info "Installing $ext_name through the official Blueprint CLI..."
+    if (cd "$PANEL_DIR" && blueprint -install "$ext_name") >"$install_log" 2>&1; then
+        status=0
+    else
+        status=$?
     fi
     rm -f "$package_file"
-    err "Blueprint failed to install $ext_name."
-    return 1
+
+    # Show normal Blueprint output only after capturing it, so Laravel exceptions
+    # can be identified and reported without printing a confusing false success.
+    if [[ "$status" -ne 0 ]] || grep -Eqi 'Target class .* does not exist|Class .* does not exist|ReflectionException|BindingResolutionException' "$install_log"; then
+        err "Blueprint reported an installation error for $ext_name."
+        sed -n '1,45p' "$install_log"
+        warn "Full installation log: $install_log"
+        return 1
+    fi
+
+    if ! panel_artisan_health_check; then
+        err "$ext_name command completed, but the panel Laravel bootstrap check failed afterward."
+        warn "Do not treat this as a clean installation until the reported provider error is fixed."
+        warn "Blueprint output log: $install_log"
+        return 1
+    fi
+
+    cat "$install_log"
+    rm -f "$install_log"
+    ok "Installed $ext_name; post-install Laravel check passed."
+    return 0
 }
 
 remove_ext() {
@@ -168,6 +263,7 @@ remove_ext() {
     need_root || return 1
     valid_panel_dir || { err "Panel directory not found: $PANEL_DIR"; return 1; }
     command_exists blueprint || { err "Blueprint CLI is not installed."; return 1; }
+    panel_artisan_health_check || return 1
     warn "This will remove extension '$ext_name'."
     read -r -p "Are you sure? [y/N]: " answer
     [[ "$answer" =~ ^[Yy]$ ]] || return 0
