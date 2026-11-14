@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v2.1 - Fixed
+# Extension Hub v3.0 - Full Working
 set -Eeuo
 
 APP_NAME="Extension Hub"
-APP_VERSION="v2.1"
+APP_VERSION="v3.0"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -41,7 +41,7 @@ command_exists() { command -v "$1" >/dev/null 2>&1; }
 need_root() { [[ "$EUID" -eq 0 ]] || { err "Run as root."; return 1; }; }
 valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/composer.json" ]]; }
 detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]]; }
-blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
+blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo "Unknown"; }
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
 # ==========================================
@@ -58,7 +58,6 @@ fix_sagatrashbin() {
     cd "$PANEL_DIR" || return 1
     composer dump-autoload --no-scripts -q 2>/dev/null || true
     
-    # Missing route files banayein
     for f in routes/api-client.php routes/api-application.php routes/web-client.php; do
         [[ -f "$f" ]] || { echo "<?php" > "$f"; chown www-data:www-data "$f"; chmod 644 "$f"; }
     done
@@ -88,7 +87,7 @@ get_disk_usage() { df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"; }
 get_current_user() { echo "${USER:-root}"; }
 
 # ==========================================
-# REAL BLUEPRINT INSTALL
+# REAL BLUEPRINT OPERATIONS
 # ==========================================
 install_blueprint() {
     need_root || return 1
@@ -133,15 +132,12 @@ install_blueprint() {
     
     chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
     
-    # MANUAL REGISTER SERVICE PROVIDER
-    info "Manually registering Blueprint service provider..."
     if [[ -f "$PANEL_DIR/app/BlueprintFramework/BlueprintServiceProvider.php" ]]; then
         if ! grep -q "BlueprintFramework" "$PANEL_DIR/config/app.php" 2>/dev/null; then
             sed -i "/App\\\\Providers\\\\AppServiceProvider::class,/a \        App\\\\BlueprintFramework\\\\BlueprintServiceProvider::class," "$PANEL_DIR/config/app.php" 2>/dev/null || true
         fi
     fi
     
-    # Clear everything
     composer dump-autoload --no-scripts -q 2>/dev/null || true
     php artisan package:discover >/dev/null 2>&1 || true
     php artisan clear-compiled >/dev/null 2>&1 || true
@@ -150,14 +146,95 @@ install_blueprint() {
     fix_sagatrashbin
     
     if php artisan list 2>/dev/null | grep -q "blueprint:install"; then
-        ok "Blueprint registered successfully!"
+        ok "Blueprint installed and registered successfully!"
     else
         err "Blueprint CLI still not registered."
-        warn "Check: grep -i blueprint $PANEL_DIR/config/app.php"
     fi
 }
+
+update_blueprint() {
+    need_root || return 1
+    detect_blueprint || { err "Blueprint not installed."; return 1; }
+    
+    warn "This will update Blueprint to the latest version."
+    read -r -p "Continue? [y/N]: " answer
+    [[ "$answer" =~ ^[Yy]$ ]] || return 0
+    
+    info "Downloading latest Blueprint..."
+    TMP_DIR="$(mktemp -d)"
+    if ! curl -fL --retry 3 "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -o "$TMP_DIR/release.zip"; then err "Download failed."; return 1; fi
+    
+    info "Extracting..."
+    cd "$PANEL_DIR" || return 1
+    cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
+    unzip -o release.zip >/dev/null
+    rm -f release.zip
+    
+    info "Installing Yarn packages..."
+    yarn install --silent >/dev/null 2>&1 || yarn install
+    
+    info "Running setup..."
+    chmod +x "$PANEL_DIR/blueprint.sh"
+    cd "$PANEL_DIR" && bash ./blueprint.sh
+    
+    chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
+    composer dump-autoload --no-scripts -q 2>/dev/null || true
+    php artisan package:discover >/dev/null 2>&1 || true
+    php artisan clear-compiled >/dev/null 2>&1 || true
+    
+    ok "Blueprint updated successfully!"
+    blueprint_version
+}
+
+uninstall_blueprint() {
+    need_root || return 1
+    detect_blueprint || { err "Blueprint not installed."; return 1; }
+    
+    warn "WARNING: This will remove Blueprint files from $PANEL_DIR"
+    warn "Panel will remain intact but Blueprint will stop working."
+    read -r -p "Type 'yes' to confirm uninstall: " answer
+    [[ "$answer" == "yes" ]] || { info "Cancelled."; return 0; }
+    
+    info "Removing Blueprint files..."
+    rm -f "$PANEL_DIR/blueprint.sh" "$PANEL_DIR/.blueprintrc" "$PANEL_DIR/release.zip"
+    rm -rf "$PANEL_DIR/app/BlueprintFramework"
+    rm -rf "$PANEL_DIR/.blueprint"
+    
+    # Remove service provider from config
+    if grep -q "BlueprintFramework" "$PANEL_DIR/config/app.php" 2>/dev/null; then
+        sed -i '/BlueprintFramework/d' "$PANEL_DIR/config/app.php" 2>/dev/null || true
+    fi
+    
+    composer dump-autoload --no-scripts -q 2>/dev/null || true
+    php artisan package:discover >/dev/null 2>&1 || true
+    php artisan clear-compiled >/dev/null 2>&1 || true
+    rm -rf "$PANEL_DIR/bootstrap/cache/"*.php 2>/dev/null || true
+    
+    ok "Blueprint uninstalled successfully."
+}
+
+blueprint_info_menu() {
+    clear
+    printf "${C_CYAN}================================================${C_RESET}\n"
+    printf "${C_CYAN}           BLUEPRINT INFO${C_RESET}\n"
+    printf "${C_CYAN}================================================${C_RESET}\n\n"
+    
+    printf "Panel Directory : %s\n" "$PANEL_DIR"
+    printf "Blueprint File  : %s\n" "$([[ -f "$PANEL_DIR/blueprint.sh" ]] && echo "EXISTS" || echo "MISSING")"
+    printf "Config File     : %s\n" "$([[ -f "$PANEL_DIR/.blueprintrc" ]] && echo "EXISTS" || echo "MISSING")"
+    printf "CLI Registered  : %s\n" "$(php artisan list 2>/dev/null | grep -q "blueprint:install" && echo "YES" || echo "NO")"
+    printf "Blueprint Ver   : %s\n" "$(blueprint_version)"
+    printf "Panel Ver       : %s\n" "$(panel_version)"
+    printf "Node.js         : %s\n" "$(node --version 2>/dev/null || echo "Missing")"
+    printf "Yarn            : %s\n" "$(yarn --version 2>/dev/null || echo "Missing")"
+    printf "PHP             : %s\n" "$(php --version 2>/dev/null | head -n1 || echo "Missing")"
+    printf "Composer        : %s\n" "$(composer --version 2>/dev/null || echo "Missing")"
+    echo
+    pause
+}
+
 # ==========================================
-# REAL EXTENSION LOGIC (WITH AUTO FIX)
+# REAL EXTENSION LOGIC
 # ==========================================
 install_ext() {
     local ext_id="$1" ext_name="$2"
@@ -181,7 +258,6 @@ install_ext() {
     
     fix_sagatrashbin
     
-    # Check agar blueprint command exist karti hai
     if ! php artisan list 2>/dev/null | grep -q "blueprint:install"; then
         err "Blueprint CLI register nahi hai. Pehle [1] Blueprint -> Reinstall karein."
         return 1
@@ -217,7 +293,18 @@ remove_ext() {
     info "Removing Extension: $ext_name (ID: $ext_id)"
     if [[ ! -d "$PANEL_DIR" ]]; then err "Panel directory not found."; return 1; fi
     cd "$PANEL_DIR" || return 1
-    if php artisan blueprint:remove "$ext_name"; then ok "Removed $ext_name successfully."; else err "Failed to remove $ext_name."; fi
+    
+    if ! php artisan list 2>/dev/null | grep -q "blueprint:remove"; then
+        err "Blueprint CLI register nahi hai."
+        return 1
+    fi
+    
+    if php artisan blueprint:remove "$ext_name"; then 
+        ok "Removed $ext_name successfully."
+    else 
+        err "Failed to remove $ext_name."
+    fi
+    
     php artisan view:clear >/dev/null 2>&1 || true
     php artisan config:clear >/dev/null 2>&1 || true
     php artisan cache:clear >/dev/null 2>&1 || true
@@ -356,7 +443,7 @@ playtely_extensions_menu() {
 }
 
 # ==========================================
-# THEME MENU
+# THEME MENU - FULLY WORKING
 # ==========================================
 playtely_theme_menu() {
     while true; do
@@ -393,10 +480,10 @@ playtely_theme_menu() {
                         read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
                             1) install_blueprint; pause ;;
-                            2) info "Mock Update"; pause ;;
-                            3) echo "Blueprint Info"; pause ;;
+                            2) update_blueprint; pause ;;
+                            3) blueprint_info_menu ;;
                             4) printf '\nBlueprint version: %s\nPanel version: %s\n' "$(blueprint_version)" "$(panel_version)"; pause ;;
-                            5) warn "Uninstall disabled"; pause ;;
+                            5) uninstall_blueprint; pause ;;
                             0) break ;;
                             *) warn "Invalid option."; sleep 1 ;;
                         esac
@@ -478,7 +565,7 @@ menu_wings() { clear; printf "${C_CYAN}=== WINGS NODE MANAGER ===${C_RESET}\n\n"
 menu_toolbox() { clear; printf "${C_CYAN}=== TOOLBOX ===${C_RESET}\n\n1. System Check\n2. View Logs\n0. Back\n\n"; read -r -p "Select: " ch; case "$ch" in 1) system_check; pause;; 2) view_logs; pause;; esac; }
 menu_system() { clear; printf "${C_CYAN}=== SYSTEM INFO ===${C_RESET}\n\nOS: %s\nUptime: %s\nMemory: %s\nDisk: %s\n" "$(uname -sr)" "$(uptime -p)" "$(free -h | awk '/Mem:/ {print $3 " / " $2}')" "$(df -h / | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}')"; pause; }
 menu_container() { clear; printf "${C_CYAN}=== CONTAINERS ===${C_RESET}\n\n"; if command_exists docker; then docker ps --format "table {{.Names}}\t{{.Status}}"; else warn "Docker not installed."; fi; pause; }
-menu_backup() { clear; printf "${C_CYAN}=== BACKUP MANAGER ===${C_RESET}\n\n"; ls -lh "$BACKUP_DIR" 2>/dev/null || warn "No backups found."; echo; read -r -p "Create new backup? [y/N]: " ans; [[ "$ans" =~ ^[Yy]$ ]] && { need_root && make_backup && ok "Done."; }; pause; }
+menu_backup() { clear; printf "${C_CYAN}=== BACKUP MANAGER ===${C_RESET}\n\n"; mkdir -p /var/backups/extension-hub; ls -lh /var/backups/extension-hub; echo; read -r -p "Create panel backup? [y/N]: " ans; if [[ "$ans" =~ ^[Yy]$ ]]; then tar -czf "/var/backups/extension-hub/panel-$(date +%Y%m%d-%H%M%S).tar.gz" -C "$(dirname "$PANEL_DIR")" "$(basename "$PANEL_DIR")" && ok "Backup created." || err "Backup failed."; fi; pause; }
 menu_about() { clear; printf "${C_CYAN}=== ABOUT ===${C_RESET}\n\nExtension Hub %s\nAuthor: %s\nBlueprint: %s\n" "$APP_VERSION" "$AUTHOR" "$(detect_blueprint && echo "ONLINE" || echo "OFFLINE")"; pause; }
 menu_new_models() { clear; printf "${C_CYAN}=== NEW MODELS (CUSTOM) ===${C_RESET}\n\nYahan aap apna custom code likh sakte hain.\n\n"; pause; }
 menu_help() { clear; printf "${C_CYAN}=== HELP ===${C_RESET}\n\n1. Panel: Install/Manage Blueprint.\n2. Wings: Daemon nodes.\n3. Toolbox: System check.\n4. Theme: UI themes.\n5. System: Hardware info.\n6. Container: Docker.\n7. Backup: Backups.\n8. About: Info.\n9. New Models: Custom.\n10. Help.\n"; pause; }
