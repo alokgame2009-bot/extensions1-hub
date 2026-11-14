@@ -8,8 +8,9 @@ AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
 BASE_URL="https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main"
-PANEL_DIR="/var/www/pterodactyl"
+PANEL_DIR="${PTERODACTYL_DIRECTORY:-/var/www/pterodactyl}"
 EXT_GITHUB_RAW="https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main/extensions"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/extension-hub}"
 
 # ---------- colors ----------
 if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
@@ -40,7 +41,10 @@ pause() { echo; read -r -p "Press Enter to continue..." _ || true; }
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 need_root() { [[ "$EUID" -eq 0 ]] || { err "Run as root."; return 1; }; }
 valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/composer.json" ]]; }
-detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]]; }
+detect_blueprint() {
+    valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]] &&
+    { [[ -x /usr/local/bin/blueprint ]] || command_exists blueprint; }
+}
 blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
@@ -66,115 +70,109 @@ get_current_user() { echo "${USER:-root}"; }
 # ==========================================
 install_blueprint() {
     need_root || return 1
-    
+    valid_panel_dir || { err "Pterodactyl panel not found: $PANEL_DIR"; return 1; }
     if detect_blueprint; then
         warn "Blueprint is already installed."
-        return 1
+        read -r -p "Run Blueprint repair/setup again? [y/N]: " repair_answer
+        [[ "$repair_answer" =~ ^[Yy]$ ]] || return 0
+        (cd "$PANEL_DIR" && blueprint -rerun-install)
+        return $?
     fi
-
-    echo
-    warn "This will install Blueprint Framework into: $PANEL_DIR"
+    command_exists apt-get || { err "Debian/Ubuntu apt-get is required."; return 1; }
+    warn "Blueprint will modify panel files: $PANEL_DIR"
+    warn "Take a full panel and database backup first."
     read -r -p "Continue? [y/N]: " answer
     [[ "$answer" =~ ^[Yy]$ ]] || return 0
 
-    info "Step 1/5: Installing dependencies (Node.js, Yarn, etc)..."
-    apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git unzip wget zip
-    install -d -m 0755 /etc/apt/keyrings
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg 2>/dev/null
-    echo 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
-    apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
-    if ! command -v yarn >/dev/null 2>&1; then npm install --global yarn >/dev/null 2>&1; fi
-    ok "Dependencies installed."
-
-    info "Step 2/5: Downloading latest Blueprint release..."
     TMP_DIR="$(mktemp -d)"
-    if ! curl -fL --retry 3 "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -o "$TMP_DIR/release.zip"; then
-        err "Failed to download Blueprint."
-        return 1
-    fi
+    info "Installing dependencies..."
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git gnupg unzip wget zip
+    info "Installing Node.js 22..."
+    install -d -m 0755 /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg
+    chmod 0644 /etc/apt/keyrings/nodesource.gpg
+    printf '%s\\n' 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+    command_exists node && command_exists npm || { err "Node.js/npm installation failed."; return 1; }
 
-    info "Step 3/5: Extracting files into panel..."
-    cd "$PANEL_DIR" || return 1
-    cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
-    unzip -o release.zip >/dev/null
-    rm -f release.zip
+    info "Installing Yarn..."
+    npm install --global yarn
+    command_exists yarn || { err "Yarn installation failed."; return 1; }
 
-    info "Step 4/5: Installing Yarn packages (This may take a while)..."
-    yarn install --silent >/dev/null 2>&1 || yarn install
+    info "Downloading official Blueprint release..."
+    curl -fL --retry 3 --retry-delay 2 https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip -o "$TMP_DIR/release.zip"
+    unzip -tq "$TMP_DIR/release.zip" >/dev/null || { err "Invalid Blueprint ZIP."; return 1; }
+    info "Extracting Blueprint..."
+    unzip -o "$TMP_DIR/release.zip" -d "$PANEL_DIR"
+    [[ -f "$PANEL_DIR/blueprint.sh" ]] || { err "blueprint.sh missing from release."; return 1; }
 
-    info "Step 5/5: Running Blueprint setup script..."
-    chmod +x "$PANEL_DIR/blueprint.sh"
-    cd "$PANEL_DIR" && bash ./blueprint.sh
-
-    chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
-
-    if detect_blueprint; then
-        ok "Blueprint installed successfully!"
+    info "Installing panel Yarn dependencies..."
+    (cd "$PANEL_DIR" && yarn install)
+    if [[ ! -f "$PANEL_DIR/.blueprintrc" ]]; then
+        cat > "$PANEL_DIR/.blueprintrc" <<'BLUEPRINT_RC'
+WEBUSER="www-data";
+OWNERSHIP="www-data:www-data";
+USERSHELL="/bin/bash";
+BLUEPRINT_RC
     else
-        err "Installation finished but verification failed."
+        info "Existing .blueprintrc found; preserving your current settings."
     fi
+    chmod +x "$PANEL_DIR/blueprint.sh"
+    info "Running official Blueprint setup..."
+    (cd "$PANEL_DIR" && bash ./blueprint.sh)
+    if [[ -x /usr/local/bin/blueprint ]] || command_exists blueprint; then
+        ok "Blueprint CLI installed."
+        blueprint -version || true
+        return 0
+    fi
+    err "Setup ended but Blueprint CLI was not found. Review the installer output."
+    return 1
 }
 
 # ==========================================
 # REAL EXTENSION LOGIC
 # ==========================================
 install_ext() {
-    local ext_id="$1"
-    local ext_name="$2"
-    local file_name="${ext_name}.blueprint"
-    local download_url="${EXT_GITHUB_RAW}/${file_name}"
-    local tmp_file="/tmp/${file_name}"
-    
-    info "Installing Extension: $ext_name (ID: $ext_id)"
-    
-    if [[ ! -d "$PANEL_DIR" ]]; then
-        err "Panel directory not found."
+    local ext_id="$1" ext_name="$2" tmp_file package_file
+    need_root || return 1
+    valid_panel_dir || { err "Panel directory not found: $PANEL_DIR"; return 1; }
+    command_exists blueprint || { err "Install Blueprint first."; return 1; }
+
+    package_file="$PANEL_DIR/${ext_name}.blueprint"
+    [[ ! -e "$package_file" ]] || { err "Package already exists: $package_file"; return 1; }
+    tmp_file="$(mktemp "$PANEL_DIR/.extension-download-XXXXXX")"
+
+    info "Downloading ${ext_name}.blueprint..."
+    if ! curl -fL --retry 3 --retry-delay 2 "${EXT_GITHUB_RAW}/${ext_name}.blueprint" -o "$tmp_file"; then
+        rm -f "$tmp_file"
+        err "Extension download failed; verify that the package exists in the GitHub extensions folder."
         return 1
     fi
 
-    if ! curl -fsSL --retry 3 "$download_url" -o "$tmp_file"; then
-        err "Failed to download $file_name from GitHub."
-        return 1
+    mv "$tmp_file" "$package_file"
+    info "Installing with the official Blueprint CLI..."
+    if (cd "$PANEL_DIR" && blueprint -install "${ext_name}.blueprint"); then
+        rm -f "$package_file"
+        ok "Installed $ext_name."
+        return 0
     fi
-
-    cd "$PANEL_DIR" || return 1
-    if php artisan blueprint:install "$tmp_file"; then
-        ok "Installed $ext_name successfully."
-    else
-        err "Failed to install $ext_name."
-    fi
-    
-    php artisan view:clear >/dev/null 2>&1
-    php artisan config:clear >/dev/null 2>&1
-    php artisan cache:clear >/dev/null 2>&1
-    
-    rm -f "$tmp_file"
+    rm -f "$package_file"
+    err "Blueprint failed to install $ext_name."
+    return 1
 }
 
 remove_ext() {
-    local ext_id="$1"
-    local ext_name="$2"
-    
-    info "Removing Extension: $ext_name (ID: $ext_id)"
-    
-    if [[ ! -d "$PANEL_DIR" ]]; then
-        err "Panel directory not found."
-        return 1
-    fi
-
-    cd "$PANEL_DIR" || return 1
-    
-    if php artisan blueprint:remove "$ext_name"; then
-        ok "Removed $ext_name successfully."
-    else
-        err "Failed to remove $ext_name."
-    fi
-    
-    php artisan view:clear >/dev/null 2>&1
-    php artisan config:clear >/dev/null 2>&1
-    php artisan cache:clear >/dev/null 2>&1
+    local ext_id="$1" ext_name="$2"
+    need_root || return 1
+    valid_panel_dir || { err "Panel directory not found: $PANEL_DIR"; return 1; }
+    command_exists blueprint || { err "Blueprint CLI is not installed."; return 1; }
+    warn "This will remove extension '$ext_name'."
+    read -r -p "Are you sure? [y/N]: " answer
+    [[ "$answer" =~ ^[Yy]$ ]] || return 0
+    if (cd "$PANEL_DIR" && blueprint -remove "$ext_name"); then ok "Removed $ext_name."; return 0; fi
+    err "Blueprint failed to remove $ext_name."; return 1
 }
 
 # ==========================================
@@ -265,7 +263,7 @@ playtely_extensions_menu() {
                     for sel in "${selected_extensions[@]}"; do
                         for ext in "${extensions[@]}"; do
                             IFS='|' read -r id name <<< "$ext"
-                            if [ "$id" == "$sel" ]; then install_ext "$id" "$name"; fi
+                            if [ "$id" == "$sel" ]; then install_ext "$id" "$name" || warn "Extension install failed: $name"; fi
                         done
                     done
                     echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
@@ -278,7 +276,7 @@ playtely_extensions_menu() {
                     for sel in "${selected_extensions[@]}"; do
                         for ext in "${extensions[@]}"; do
                             IFS='|' read -r id name <<< "$ext"
-                            if [ "$id" == "$sel" ]; then remove_ext "$id" "$name"; fi
+                            if [ "$id" == "$sel" ]; then remove_ext "$id" "$name" || warn "Extension removal failed: $name"; fi
                         done
                     done
                     echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
@@ -340,7 +338,7 @@ playtely_theme_menu() {
                     printf " ${C_CYAN}BLUEPRINT PANEL${C_RESET}\n"
                     if detect_blueprint; then
                         printf " ${C_CYAN}Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
-                        printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Reinstall${C_RESET}\n"
+                        printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Repair / Re-run Setup${C_RESET}\n"
                         printf " ${C_GREEN}[2]${C_RESET} ${C_CYAN}Update${C_RESET}\n"
                         printf " ${C_GREEN}[3]${C_RESET} ${C_CYAN}Info${C_RESET}\n"
                         printf " ${C_GREEN}[4]${C_RESET} ${C_CYAN}Version${C_RESET}\n"
@@ -348,11 +346,11 @@ playtely_theme_menu() {
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
                         read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
-                            1) install_blueprint; pause ;;
-                            2) info "Mock Update"; pause ;;
-                            3) echo "Blueprint Info"; pause ;;
-                            4) printf '\nBlueprint version: %s\nPanel version: %s\n' "$(blueprint_version)" "$(panel_version)"; pause ;;
-                            5) warn "Uninstall disabled"; pause ;;
+                            1) if ! install_blueprint; then warn "Blueprint installation failed."; fi; pause ;;
+                            2) if command_exists blueprint; then (cd "$PANEL_DIR" && blueprint -upgrade) || err "Blueprint update failed."; else err "Blueprint CLI not found."; fi; pause ;;
+                            3) if command_exists blueprint; then (cd "$PANEL_DIR" && blueprint -info); else err "Blueprint CLI not found."; fi; pause ;;
+                            4) if command_exists blueprint; then (cd "$PANEL_DIR" && blueprint -version); else err "Blueprint CLI not found."; fi; printf "Panel version: %s\n" "$(panel_version)"; pause ;;
+                            5) warn "Automatic uninstall is disabled for safety: official removal deletes panel files and requires restoring Pterodactyl. Follow the official removal guide after a full backup."; pause ;;
                             0) break ;;
                             *) warn "Invalid option."; sleep 1 ;;
                         esac
@@ -362,7 +360,7 @@ playtely_theme_menu() {
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
                         read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
-                            1) install_blueprint; pause ;;
+                            1) if ! install_blueprint; then warn "Blueprint installation failed."; fi; pause ;;
                             0) break ;;
                             *) warn "Invalid option."; sleep 1 ;;
                         esac
@@ -376,6 +374,8 @@ playtely_theme_menu() {
         esac
     done
 }
+
+menu_panel() { playtely_theme_menu; }
 
 # ==========================================
 # UI & DRAWING
@@ -432,7 +432,24 @@ menu_wings() { clear; printf "${C_CYAN}=== WINGS NODE MANAGER ===${C_RESET}\n\n"
 menu_toolbox() { clear; printf "${C_CYAN}=== TOOLBOX ===${C_RESET}\n\n1. System Check\n2. View Logs\n0. Back\n\n"; read -r -p "Select: " ch; case "$ch" in 1) system_check; pause;; 2) view_logs; pause;; esac; }
 menu_system() { clear; printf "${C_CYAN}=== SYSTEM INFO ===${C_RESET}\n\nOS: %s\nUptime: %s\nMemory: %s\nDisk: %s\n" "$(uname -sr)" "$(uptime -p)" "$(free -h | awk '/Mem:/ {print $3 " / " $2}')" "$(df -h / | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}')"; pause; }
 menu_container() { clear; printf "${C_CYAN}=== CONTAINERS ===${C_RESET}\n\n"; if command_exists docker; then docker ps --format "table {{.Names}}\t{{.Status}}"; else warn "Docker not installed."; fi; pause; }
-menu_backup() { clear; printf "${C_CYAN}=== BACKUP MANAGER ===${C_RESET}\n\n"; ls -lh "$BACKUP_DIR" 2>/dev/null || warn "No backups found."; echo; read -r -p "Create new backup? [y/N]: " ans; [[ "$ans" =~ ^[Yy]$ ]] && { need_root && make_backup && ok "Done."; }; pause; }
+make_backup() {
+    need_root || return 1
+    valid_panel_dir || { err "Panel directory not found: $PANEL_DIR"; return 1; }
+    install -d -m 0750 "$BACKUP_DIR"
+    local archive="$BACKUP_DIR/panel-files-$(date +%Y%m%d-%H%M%S).tar.gz"
+    warn "This backs up panel files only. It does not include the database."
+    tar -czf "$archive" -C "$(dirname "$PANEL_DIR")" "$(basename "$PANEL_DIR")" || return 1
+    ok "Panel files backup saved: $archive"
+}
+menu_backup() {
+    clear
+    printf "${C_CYAN}=== BACKUP MANAGER ===${C_RESET}\n\n"
+    ls -lh "$BACKUP_DIR" 2>/dev/null || warn "No backups found."
+    echo
+    read -r -p "Create panel files backup? [y/N]: " ans
+    if [[ "$ans" =~ ^[Yy]$ ]]; then make_backup || err "Backup failed."; fi
+    pause
+}
 menu_about() { clear; printf "${C_CYAN}=== ABOUT ===${C_RESET}\n\nExtension Hub %s\nAuthor: %s\nBlueprint: %s\n" "$APP_VERSION" "$AUTHOR" "$(detect_blueprint && echo "ONLINE" || echo "OFFLINE")"; pause; }
 menu_new_models() { clear; printf "${C_CYAN}=== NEW MODELS (CUSTOM) ===${C_RESET}\n\nYahan aap apna custom code likh sakte hain.\n\n"; pause; }
 menu_help() { clear; printf "${C_CYAN}=== HELP ===${C_RESET}\n\n1. Panel: Install/Manage Blueprint.\n2. Wings: Daemon nodes.\n3. Toolbox: System check.\n4. Theme: UI themes.\n5. System: Hardware info.\n6. Container: Docker.\n7. Backup: Backups.\n8. About: Info.\n9. New Models: Custom.\n10. Help.\n"; pause; }
