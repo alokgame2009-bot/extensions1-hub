@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.5 - Fully Fixed & Cleaned
+# Extension Hub v1.6 - Fully Fixed with DB Check
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.5"
+APP_VERSION="v1.6"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -122,7 +122,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Real Database Status Check)
+# EXTENSIONS GRID MENU (Database Check)
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -148,10 +148,26 @@ playtely_extensions_menu() {
     declare -a selected_extensions=()
 
     while true; do
-        # FETCH REAL INSTALLED EXTENSIONS FROM BLUEPRINT
+        # FETCH REAL INSTALLED EXTENSIONS FROM BLUEPRINT / DATABASE
         local installed_list=""
         if [[ -d "$PANEL_DIR" ]]; then
             installed_list=$(cd "$PANEL_DIR" && php artisan blueprint:list 2>/dev/null | grep -Eo '^[a-zA-Z0-9_]+' || echo "")
+            
+            if [[ -z "$installed_list" ]]; then
+                installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="echo \App\BlueprintFramework\Blueprint::getInstalledExtensions()->pluck('name')->implode(' ');" 2>/dev/null || echo "")
+            fi
+            
+            if [[ -z "$installed_list" ]]; then
+                installed_list=$(cd "$PANEL_DIR" && php -r '
+                    require "vendor/autoload.php";
+                    $app = require_once "bootstrap/app.php";
+                    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+                    try {
+                        $exts = DB::table("blueprint_extensions")->pluck("name")->toArray();
+                        echo implode(" ", $exts);
+                    } catch (\Exception $e) { echo ""; }
+                ' 2>/dev/null || echo "")
+            fi
         fi
 
         clear 2>/dev/null || true
@@ -172,9 +188,9 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Status Check Left (Check from installed_list)
+            # Status Check Left (DB)
             local status1="○"; local status_col1="${C_RED}"
-            if echo "$installed_list" | grep -qi "^${name1}$"; then
+            if echo "$installed_list" | grep -qi "\b${name1}\b"; then
                 status1="●"; status_col1="${C_GREEN}"
             fi
             
@@ -188,9 +204,9 @@ playtely_extensions_menu() {
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
                 
-                # Status Check Right
+                # Status Check Right (DB)
                 local status2="○"; local status_col2="${C_RED}"
-                if echo "$installed_list" | grep -qi "^${name2}$"; then
+                if echo "$installed_list" | grep -qi "\b${name2}\b"; then
                     status2="●"; status_col2="${C_GREEN}"
                 fi
                 
