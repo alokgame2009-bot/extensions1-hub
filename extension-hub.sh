@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.4 - Fast & Crash-Proof
+# Extension Hub v2.0 - Auto Fix & Fast
 set -Eeuo
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.4"
+APP_VERSION="v2.0"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -43,6 +43,38 @@ valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_
 detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]]; }
 blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
+
+# ==========================================
+# AUTO FIX SAGATRASHBIN ISSUE
+# ==========================================
+fix_sagatrashbin() {
+    if [[ ! -d "$PANEL_DIR" ]]; then return 0; fi
+    info "Checking for broken extensions (sagatrashbin)..."
+    
+    # 1. Delete files
+    find "$PANEL_DIR" -type d -iname "*sagatrashbin*" -exec rm -rf {} + 2>/dev/null || true
+    find "$PANEL_DIR" -type f -iname "*sagatrashbin*" -delete 2>/dev/null || true
+    
+    # 2. Remove references from PHP files
+    grep -r "sagatrashbin" "$PANEL_DIR" --include="*.php" -l 2>/dev/null | xargs rm -f 2>/dev/null || true
+    
+    # 3. Clear Composer autoload
+    cd "$PANEL_DIR" || return 1
+    composer dump-autoload --no-scripts -q 2>/dev/null || true
+    
+    # 4. Clear Laravel caches manually (bypass artisan if it crashes)
+    rm -rf "$PANEL_DIR/bootstrap/cache/"*.php 2>/dev/null || true
+    rm -rf "$PANEL_DIR/storage/framework/cache/data/"* 2>/dev/null || true
+    rm -rf "$PANEL_DIR/storage/framework/views/"* 2>/dev/null || true
+    
+    # 5. Try to delete from database silently
+    php artisan tinker --execute="
+        try { DB::table('extensions')->where('name', 'sagatrashbin')->delete(); } catch(\Exception \$e) {}
+        try { DB::table('blueprint_extensions')->where('name', 'sagatrashbin')->delete(); } catch(\Exception \$e) {}
+    " 2>/dev/null || true
+    
+    ok "Auto-fix completed."
+}
 
 # ==========================================
 # SYSTEM STATS FUNCTIONS
@@ -90,7 +122,7 @@ install_blueprint() {
 }
 
 # ==========================================
-# REAL EXTENSION LOGIC
+# REAL EXTENSION LOGIC (WITH AUTO FIX)
 # ==========================================
 install_ext() {
     local ext_id="$1" ext_name="$2"
@@ -113,42 +145,35 @@ install_ext() {
     
     cd "$PANEL_DIR" || return 1
     
-    # Backup original composer.json
-    cp composer.json composer.json.bak 2>/dev/null
+    # Run Auto-Fix before install
+    fix_sagatrashbin
     
-    # Run install with temporary autoload fix
-    if php artisan blueprint:install "$tmp_file" 2>&1 | grep -v "sagatrashbin"; then
+    # Install
+    if php artisan blueprint:install "$tmp_file" > /tmp/install_ext.log 2>&1; then
         ok "Installed $ext_name successfully."
     else
-        # If error is only about sagatrashbin, ignore it
-        local error_output=$(php artisan blueprint:install "$tmp_file" 2>&1)
-        if echo "$error_output" | grep -q "sagatrashbin"; then
-            warn "Detected sagatrashbin issue. Trying to bypass..."
-            
-            # Create temporary fix - rename sagatrashbin references
-            find "$PANEL_DIR" -type f -name "*.php" -exec sed -i 's/sagatrashbin/tempdisabled_sagatrashbin/g' {} \; 2>/dev/null
-            
-            # Run composer dump-autoload to clear cache
-            composer dump-autoload -q 2>/dev/null
-            
-            # Try install again
-            if php artisan blueprint:install "$tmp_file" 2>&1 | grep -q "Installed"; then
-                ok "Installed $ext_name successfully (bypassed sagatrashbin)."
+        # If fail, check if it was sagatrashbin
+        if grep -q "sagatrashbin" /tmp/install_ext.log; then
+            warn "Detected sagatrashbin issue. Running Deep Fix..."
+            fix_sagatrashbin
+            if php artisan blueprint:install "$tmp_file" >> /tmp/install_ext.log 2>&1; then
+                ok "Installed $ext_name successfully (after fix)."
             else
                 err "Failed to install $ext_name even after fix."
             fi
         else
             err "Failed to install $ext_name."
-            echo "$error_output" | head -20
+            cat /tmp/install_ext.log | head -10
         fi
     fi
     
     # Clear caches
-    php artisan view:clear >/dev/null 2>&1
-    php artisan config:clear >/dev/null 2>&1
-    php artisan cache:clear >/dev/null 2>&1
+    php artisan view:clear >/dev/null 2>&1 || true
+    php artisan config:clear >/dev/null 2>&1 || true
+    php artisan cache:clear >/dev/null 2>&1 || true
     
     rm -f "$tmp_file"
+    rm -f /tmp/install_ext.log
 }
 
 remove_ext() {
@@ -157,9 +182,9 @@ remove_ext() {
     if [[ ! -d "$PANEL_DIR" ]]; then err "Panel directory not found."; return 1; fi
     cd "$PANEL_DIR" || return 1
     if php artisan blueprint:remove "$ext_name"; then ok "Removed $ext_name successfully."; else err "Failed to remove $ext_name."; fi
-    php artisan view:clear >/dev/null 2>&1
-    php artisan config:clear >/dev/null 2>&1
-    php artisan cache:clear >/dev/null 2>&1
+    php artisan view:clear >/dev/null 2>&1 || true
+    php artisan config:clear >/dev/null 2>&1 || true
+    php artisan cache:clear >/dev/null 2>&1 || true
 }
 
 # ==========================================
@@ -198,13 +223,11 @@ playtely_extensions_menu() {
             IFS='|' read -r id1 name1 <<< "${extensions[$i]}"
             local right_index=$((i + half))
             
-            # Left Column
             local sel1="[-]"; local col1="${C_GRAY}"
             for s in "${selected_extensions[@]}"; do 
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Fast Filesystem Check
             local status1="○"; local status_col1="${C_RED}"
             if [[ -d "$PANEL_DIR/extensions/$name1" ]] || \
                [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]] || \
@@ -216,7 +239,6 @@ playtely_extensions_menu() {
             
             printf " ${col1}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col1}%s${C_RESET}" "$sel1" "$id1" "$name1" "$status1"
             
-            # Right Column
             if [ "$right_index" -lt "${#extensions[@]}" ]; then
                 IFS='|' read -r id2 name2 <<< "${extensions[$right_index]}"
                 local sel2="[-]"; local col2="${C_GRAY}"
