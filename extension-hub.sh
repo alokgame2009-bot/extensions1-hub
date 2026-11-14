@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.0 - Final Clean Version
+# Extension Hub v1.1 - Final Fixed
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.0"
+APP_VERSION="v1.1"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -69,13 +69,33 @@ blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
 # ==========================================
-# SYSTEM STATS
+# SYSTEM STATS (SAFE VERSION)
 # ==========================================
-get_cpu_usage() { local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}'); printf "%.0f" "${cpu:-0}"; }
-get_ram_usage() { free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' || echo "0"; }
-get_network_status() { if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}CONNECTED${C_RESET}"; else printf "${C_RED}DISCONNECTED${C_RESET}"; fi; }
-get_uptime() { uptime -p 2>/dev/null | sed 's/up //; s/ weeks/ weeks,/; s/ days/ days,/' || echo "Unknown"; }
-get_disk_usage() { df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"; }
+get_cpu_usage() { 
+    local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
+    cpu=$(echo "$cpu" | tr -d '\n' | tr -d ' ')
+    printf "%.0f" "${cpu:-0}"
+}
+get_ram_usage() { 
+    local ram=$(free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}')
+    ram=$(echo "$ram" | tr -d '\n' | tr -d ' ')
+    printf "%.0f" "${ram:-0}"
+}
+get_network_status() { 
+    if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then 
+        printf "${C_GREEN}CONNECTED${C_RESET}"
+    else 
+        printf "${C_RED}DISCONNECTED${C_RESET}"
+    fi
+}
+get_uptime() { 
+    local up=$(uptime -p 2>/dev/null | sed 's/up //')
+    echo "$up" | tr -d '\n'
+}
+get_disk_usage() { 
+    local disk=$(df -h / 2>/dev/null | awk 'NR==2 {print $5}')
+    echo "$disk" | tr -d '\n'
+}
 get_current_user() { echo "${USER:-root}"; }
 
 # ==========================================
@@ -389,13 +409,19 @@ playtely_theme_menu() {
 menu_panel() { playtely_theme_menu; }
 
 # ==========================================
-# UI & DRAWING
+# UI & DRAWING (SAFE ECHO VERSION)
 # ==========================================
 center_line() { local text="$1"; local cols=$(tput cols 2>/dev/null || echo 80); local clean_text=$(printf "%s" "$text" | sed 's/\x1b\[[0-9;]*m//g'); local len=${#clean_text}; local padding=$(( (cols - len) / 2 )); [[ "$padding" -lt 0 ]] && padding=0; printf "%${padding}s%s\n" "" "$text"; }
 
 draw_top_bar() {
-    local user=$(get_current_user); local up=$(get_uptime); local disk=$(get_disk_usage); local ram=$(get_ram_usage); local cpu=$(get_cpu_usage)
-    printf "  [${C_WHITE}${user}${C_RESET}] [${C_WHITE}${up}${C_RESET}] [${C_WHITE}${disk}${C_RESET}] [${C_WHITE}RAM ${ram}%${C_RESET}] [${C_WHITE}CPU ${cpu}%${C_RESET}]\n"
+    local user up disk ram cpu
+    user=$(get_current_user)
+    up=$(get_uptime)
+    disk=$(get_disk_usage)
+    ram=$(get_ram_usage)
+    cpu=$(get_cpu_usage)
+    
+    echo -e "  [${C_WHITE}${user}${C_RESET}] [${C_WHITE}${up}${C_RESET}] [${C_WHITE}${disk}${C_RESET}] [${C_WHITE}RAM ${ram}%${C_RESET}] [${C_WHITE}CPU ${cpu}%${C_RESET}]"
 }
 
 show_logo() {
