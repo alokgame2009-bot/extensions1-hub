@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.1 - Ultimate Fixed
+# Extension Hub v1.0 - Ultimate Fixed with Real Blueprint Install
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.1"
+APP_VERSION="v1.0"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -40,19 +40,7 @@ pause() { echo; read -r -p "Press Enter to continue..." _ || true; }
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 need_root() { [[ "$EUID" -eq 0 ]] || { err "Run as root."; return 1; }; }
 valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/composer.json" ]]; }
-
-# STRICT DETECT BLUEPRINT: Dono files + DB check
-detect_blueprint() { 
-    valid_panel_dir || return 1
-    [[ -f "$PANEL_DIR/blueprint.sh" ]] || return 1
-    [[ -f "$PANEL_DIR/.blueprintrc" ]] || return 1
-    # Check karein ki artisan command register hai ya nahi
-    if ! (cd "$PANEL_DIR" && php artisan list 2>/dev/null | grep -q "blueprint"); then
-        return 1
-    fi
-    return 0
-}
-
+detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]]; }
 blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
@@ -72,6 +60,62 @@ get_network_status() {
 get_uptime() { uptime -p 2>/dev/null | sed 's/up //; s/ weeks/ weeks,/; s/ days/ days,/' || echo "Unknown"; }
 get_disk_usage() { df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"; }
 get_current_user() { echo "${USER:-root}"; }
+
+# ==========================================
+# REAL BLUEPRINT INSTALL
+# ==========================================
+install_blueprint() {
+    need_root || return 1
+    
+    if detect_blueprint; then
+        warn "Blueprint is already installed."
+        return 1
+    fi
+
+    echo
+    warn "This will install Blueprint Framework into: $PANEL_DIR"
+    read -r -p "Continue? [y/N]: " answer
+    [[ "$answer" =~ ^[Yy]$ ]] || return 0
+
+    info "Step 1/5: Installing dependencies (Node.js, Yarn, etc)..."
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git unzip wget zip
+    install -d -m 0755 /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg 2>/dev/null
+    echo 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
+    if ! command -v yarn >/dev/null 2>&1; then npm install --global yarn >/dev/null 2>&1; fi
+    ok "Dependencies installed."
+
+    info "Step 2/5: Downloading latest Blueprint release..."
+    TMP_DIR="$(mktemp -d)"
+    if ! curl -fL --retry 3 "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -o "$TMP_DIR/release.zip"; then
+        err "Failed to download Blueprint."
+        return 1
+    fi
+
+    info "Step 3/5: Extracting files into panel..."
+    cd "$PANEL_DIR" || return 1
+    cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
+    unzip -o release.zip >/dev/null
+    rm -f release.zip
+
+    info "Step 4/5: Installing Yarn packages (This may take a while)..."
+    yarn install --silent >/dev/null 2>&1 || yarn install
+
+    info "Step 5/5: Running Blueprint setup script..."
+    chmod +x "$PANEL_DIR/blueprint.sh"
+    cd "$PANEL_DIR" && bash ./blueprint.sh
+
+    chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
+
+    if detect_blueprint; then
+        ok "Blueprint installed successfully!"
+    else
+        err "Installation finished but verification failed."
+    fi
+}
 
 # ==========================================
 # REAL EXTENSION LOGIC
@@ -162,7 +206,6 @@ playtely_extensions_menu() {
     while true; do
         clear 2>/dev/null || true
         
-        # Header
         printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
         printf "${C_CYAN}║${C_RESET}                     ${C_PINK}Ziro.dev CONTROL HUB${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
         printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
@@ -172,24 +215,18 @@ playtely_extensions_menu() {
             IFS='|' read -r id1 name1 <<< "${extensions[$i]}"
             local right_index=$((i + half))
             
-            # Left Column
             local sel1="[-]"; local col1="${C_GRAY}"
             for s in "${selected_extensions[@]}"; do 
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Status Check Left (File Based)
             local status1="○"; local status_col1="${C_RED}"
-            if [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || \
-               [[ -f "$PANEL_DIR/app/Extensions/$name1.php" ]] || \
-               [[ -d "$PANEL_DIR/extensions/$name1" ]] || \
-               [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]]; then
+            if [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || [[ -f "$PANEL_DIR/app/Extensions/$name1.php" ]] || [[ -d "$PANEL_DIR/extensions/$name1" ]] || [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]]; then
                 status1="●"; status_col1="${C_GREEN}"
             fi
             
             printf " ${col1}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col1}%s${C_RESET}" "$sel1" "$id1" "$name1" "$status1"
             
-            # Right Column
             if [ "$right_index" -lt "${#extensions[@]}" ]; then
                 IFS='|' read -r id2 name2 <<< "${extensions[$right_index]}"
                 local sel2="[-]"; local col2="${C_GRAY}"
@@ -197,12 +234,8 @@ playtely_extensions_menu() {
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
                 
-                # Status Check Right (File Based)
                 local status2="○"; local status_col2="${C_RED}"
-                if [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || \
-                   [[ -f "$PANEL_DIR/app/Extensions/$name2.php" ]] || \
-                   [[ -d "$PANEL_DIR/extensions/$name2" ]] || \
-                   [[ -f "$PANEL_DIR/extensions/$name2.blueprint" ]]; then
+                if [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || [[ -f "$PANEL_DIR/app/Extensions/$name2.php" ]] || [[ -d "$PANEL_DIR/extensions/$name2" ]] || [[ -f "$PANEL_DIR/extensions/$name2.blueprint" ]]; then
                     status2="●"; status_col2="${C_GREEN}"
                 fi
                 
@@ -212,7 +245,6 @@ playtely_extensions_menu() {
         done
         echo ""
 
-        # Footer
         printf " ${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 80))"
         printf " ${C_WHITE}SELECTED: ${C_YELLOW}%d${C_WHITE} items${C_RESET}\n" "${#selected_extensions[@]}"
         printf " ${C_GREEN}[i] Install  ${C_RED}[r] Remove  ${C_BLUE}[a] Select All  ${C_WHITE}[c] Clear  ${C_RED}[0] Exit${C_RESET}\n\n"
@@ -316,7 +348,7 @@ playtely_theme_menu() {
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
                         read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
-                            1) info "Mock Reinstall"; pause ;;
+                            1) install_blueprint; pause ;;
                             2) info "Mock Update"; pause ;;
                             3) echo "Blueprint Info"; pause ;;
                             4) printf '\nBlueprint version: %s\nPanel version: %s\n' "$(blueprint_version)" "$(panel_version)"; pause ;;
@@ -330,7 +362,7 @@ playtely_theme_menu() {
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
                         read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
-                            1) info "Mock Install"; pause ;;
+                            1) install_blueprint; pause ;;
                             0) break ;;
                             *) warn "Invalid option."; sleep 1 ;;
                         esac
