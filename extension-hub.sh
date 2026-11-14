@@ -122,7 +122,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Ultimate 5-Layer Status Check)
+# EXTENSIONS GRID MENU (Fixed for Polymart/extension_cached_metadata)
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -148,31 +148,10 @@ playtely_extensions_menu() {
     declare -a selected_extensions=()
 
     while true; do
-        # 5-LAYER INSTALLED LIST FETCH
+        # FETCH INSTALLED EXTENSIONS FROM extension_cached_metadata TABLE
         local installed_list=""
         if [[ -d "$PANEL_DIR" ]]; then
-            # Layer 1: blueprint:list
-            installed_list=$(cd "$PANEL_DIR" && php artisan blueprint:list 2>/dev/null | grep -Eo '^[a-zA-Z0-9_]+' || true)
-            
-            # Layer 2: Database (extensions table)
-            if [[ -z "$installed_list" ]]; then
-                installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="try { echo \DB::table('extensions')->pluck('name')->implode(' '); } catch(\Exception \$e) {}" 2>/dev/null || true)
-            fi
-            
-            # Layer 3: Database (blueprint_extensions table)
-            if [[ -z "$installed_list" ]]; then
-                installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="try { echo \DB::table('blueprint_extensions')->pluck('name')->implode(' '); } catch(\Exception \$e) {}" 2>/dev/null || true)
-            fi
-            
-            # Layer 4: Files in extensions folder
-            if [[ -z "$installed_list" ]]; then
-                installed_list=$(ls -1 "$PANEL_DIR/extensions/" 2>/dev/null | grep -v '^$' | tr '\n' ' ' || true)
-            fi
-            
-            # Layer 5: Files in app/Extensions folder
-            if [[ -z "$installed_list" ]]; then
-                installed_list=$(ls -1 "$PANEL_DIR/app/Extensions/" 2>/dev/null | grep -v '^$' | tr '\n' ' ' || true)
-            fi
+            installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="try { echo DB::table('extension_cached_metadata')->pluck('name')->implode(' '); } catch(\Exception \$e) {}" 2>/dev/null || true)
         fi
 
         clear 2>/dev/null || true
