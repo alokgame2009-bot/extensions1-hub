@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v3.1 - Fixed
+# Extension Hub v4.0 - Fixed & Cleaned
 set -Eeuo
 
 APP_NAME="Extension Hub"
-APP_VERSION="v3.1"
+APP_VERSION="v4.0"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -45,12 +45,16 @@ blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
 # ==========================================
-# AUTO FIX SAGATRASHBIN ISSUE
+# AUTO FIX SAGATRASHBIN & APT CONFLICT
 # ==========================================
-fix_sagatrashbin() {
+fix_panel_issues() {
     if [[ ! -d "$PANEL_DIR" ]]; then return 0; fi
-    info "Checking for broken extensions (sagatrashbin)..."
+    info "Checking for broken extensions and conflicts..."
     
+    # Fix Node.js APT conflict
+    rm -f /etc/apt/keyrings/nodesource.gpg /usr/share/keyrings/nodesource.gpg /etc/apt/sources.list.d/nodesource.list 2>/dev/null || true
+    
+    # Clean sagatrashbin
     find "$PANEL_DIR" -type d -iname "*sagatrashbin*" -exec rm -rf {} + 2>/dev/null || true
     find "$PANEL_DIR" -type f -iname "*sagatrashbin*" -delete 2>/dev/null || true
     grep -r "sagatrashbin" "$PANEL_DIR" --include="*.php" -l 2>/dev/null | xargs rm -f 2>/dev/null || true
@@ -61,6 +65,7 @@ fix_sagatrashbin() {
     for f in routes/api-client.php routes/api-application.php routes/web-client.php; do
         [[ -f "$f" ]] || { echo "<?php" > "$f"; chown www-data:www-data "$f"; chmod 644 "$f"; }
     done
+    
     php artisan package:discover >/dev/null 2>&1 || true
     php artisan clear-compiled >/dev/null 2>&1 || true
     
@@ -73,7 +78,7 @@ fix_sagatrashbin() {
         try { DB::table('blueprint_extensions')->where('name', 'sagatrashbin')->delete(); } catch(\Exception \$e) {}
     " 2>/dev/null || true
     
-    ok "Auto-fix completed."
+    ok "Panel auto-fix completed."
 }
 
 # ==========================================
@@ -89,82 +94,153 @@ get_current_user() { echo "${USER:-root}"; }
 # ==========================================
 # REAL BLUEPRINT OPERATIONS
 # ==========================================
-Install Blueprint
-Get Blueprint installed onto your Pterodactyl panel
-Emma
-Define Pterodactyl directory
-Define your Pterodactyl directory, we'll use this later in the guide. If your Pterodactyl webserver is not located in this directory, change the path.
-
-bash
-
-Copy
-# Use this command to set a $PTERODACTYL_DIRECTORY variable
-# for use later in this guide.
-export PTERODACTYL_DIRECTORY=/var/www/pterodactyl
-Download and install Blueprint
-Download the latest version of Blueprint onto your server by either downloading the latest release from GitHub or running the commands below (which will save the file as release.zip and extract it).
-
-bash
-
-Copy
-# Install curl, wget and unzip if you haven't already
-sudo apt install -y curl wget unzip
-
-# Navigate to your Pterodactyl directory
-cd $PTERODACTYL_DIRECTORY
-
-# Download and unzip Blueprint's latest release
-wget "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -O "$PTERODACTYL_DIRECTORY/release.zip"
-unzip -o release.zip
-Dependencies
-Blueprint, just like Pterodactyl, relies on a few dependencies to function. Install them through the commands below.
-
-bash
-
-Copy
-# Install dependencies
-sudo apt install -y ca-certificates curl git gnupg unzip wget zip
-
-# Add Node.js apt repository
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-sudo apt update
-sudo apt install -y nodejs
-
-# cd into Pterodactyl, install yarn and node dependencies
-cd $PTERODACTYL_DIRECTORY
-npm i -g yarn
-yarn install
-Configure Blueprint
-This step allows Blueprint to function and know where itself and Pterodactyl are located and which permissions to use. Create a file called .blueprintrc inside of your Pterodactyl directory to begin.
-
-bash
-
-Copy
-# Creates a .blueprintrc file in your Pterodactyl directory
-touch $PTERODACTYL_DIRECTORY/.blueprintrc
-Modify the $WEBUSER, $USERSHELL and $PERMISSIONS values to match your environment. Provided below is the standard configuration for Debian-based systems, but you might need to make your own modifications.
-
-bash
-
-Copy
-# Writes data to your .blueprintrc file
-echo \
-'WEBUSER="www-data";
+install_blueprint() {
+    need_root || return 1
+    
+    if detect_blueprint; then
+        warn "Blueprint already installed. Reinstalling..."
+        read -r -p "Reinstall? [y/N]: " answer
+        [[ "$answer" =~ ^[Yy]$ ]] || return 0
+    else
+        echo; warn "This will install Blueprint Framework into: $PANEL_DIR"
+        read -r -p "Continue? [y/N]: " answer
+        [[ "$answer" =~ ^[Yy]$ ]] || return 0
+    fi
+    
+    fix_panel_issues
+    
+    info "Step 1/5: Installing dependencies..."
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl git gnupg unzip wget zip
+    
+    # Official Node.js Repo Setup
+    info "Adding Node.js repo..."
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg 2>/dev/null
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list >/dev/null
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
+    if ! command -v yarn >/dev/null 2>&1; then npm install --global yarn >/dev/null 2>&1; fi
+    ok "Dependencies installed."
+    
+    info "Step 2/5: Downloading Blueprint..."
+    cd "$PANEL_DIR" || return 1
+    wget "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -O "$PANEL_DIR/release.zip"
+    
+    info "Step 3/5: Extracting files..."
+    unzip -o release.zip >/dev/null
+    rm -f release.zip
+    
+    info "Step 4/5: Installing Yarn packages..."
+    yarn install --silent >/dev/null 2>&1 || yarn install
+    
+    info "Step 5/5: Running setup..."
+    if [[ ! -f "$PANEL_DIR/.blueprintrc" ]]; then
+        touch "$PANEL_DIR/.blueprintrc"
+        echo 'WEBUSER="www-data";
 OWNERSHIP="www-data:www-data";
-USERSHELL="/bin/bash";' > $PTERODACTYL_DIRECTORY/.blueprintrc
-Run Blueprint
-All that's left is giving blueprint.sh execute permissions and running it. Blueprint will then do the necessary commands to operate correctly automatically.
+USERSHELL="/bin/bash";' > "$PANEL_DIR/.blueprintrc"
+    fi
+    
+    chmod +x "$PANEL_DIR/blueprint.sh"
+    cd "$PANEL_DIR" && bash ./blueprint.sh
+    
+    chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
+    
+    if [[ -f "$PANEL_DIR/app/BlueprintFramework/BlueprintServiceProvider.php" ]]; then
+        if ! grep -q "BlueprintFramework" "$PANEL_DIR/config/app.php" 2>/dev/null; then
+            sed -i "/App\\\\Providers\\\\AppServiceProvider::class,/a \        App\\\\BlueprintFramework\\\\BlueprintServiceProvider::class," "$PANEL_DIR/config/app.php" 2>/dev/null || true
+        fi
+    fi
+    
+    composer dump-autoload --no-scripts -q 2>/dev/null || true
+    php artisan package:discover >/dev/null 2>&1 || true
+    php artisan clear-compiled >/dev/null 2>&1 || true
+    rm -rf "$PANEL_DIR/bootstrap/cache/"*.php 2>/dev/null || true
+    
+    fix_panel_issues
+    
+    if php artisan list 2>/dev/null | grep -q "blueprint:install"; then
+        ok "Blueprint installed and registered successfully!"
+    else
+        err "Blueprint CLI still not registered."
+    fi
+}
 
-bash
+update_blueprint() {
+    need_root || return 1
+    detect_blueprint || { err "Blueprint not installed."; return 1; }
+    
+    warn "This will update Blueprint to the latest version."
+    read -r -p "Continue? [y/N]: " answer
+    [[ "$answer" =~ ^[Yy]$ ]] || return 0
+    
+    info "Downloading latest Blueprint..."
+    cd "$PANEL_DIR" || return 1
+    wget "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -O "$PANEL_DIR/release.zip"
+    unzip -o release.zip >/dev/null
+    rm -f release.zip
+    
+    info "Installing Yarn packages..."
+    yarn install --silent >/dev/null 2>&1 || yarn install
+    
+    info "Running setup..."
+    chmod +x "$PANEL_DIR/blueprint.sh"
+    cd "$PANEL_DIR" && bash ./blueprint.sh
+    
+    chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
+    composer dump-autoload --no-scripts -q 2>/dev/null || true
+    php artisan package:discover >/dev/null 2>&1 || true
+    php artisan clear-compiled >/dev/null 2>&1 || true
+    
+    ok "Blueprint updated successfully!"
+}
 
-Copy
-# Give blueprint.sh execute permissions
-chmod +x $PTERODACTYL_DIRECTORY/blueprint.sh
+uninstall_blueprint() {
+    need_root || return 1
+    detect_blueprint || { err "Blueprint not installed."; return 1; }
+    
+    warn "WARNING: This will remove Blueprint files from $PANEL_DIR"
+    read -r -p "Type 'yes' to confirm uninstall: " answer
+    [[ "$answer" == "yes" ]] || { info "Cancelled."; return 0; }
+    
+    info "Removing Blueprint files..."
+    rm -f "$PANEL_DIR/blueprint.sh" "$PANEL_DIR/.blueprintrc" "$PANEL_DIR/release.zip"
+    rm -rf "$PANEL_DIR/app/BlueprintFramework"
+    rm -rf "$PANEL_DIR/.blueprint"
+    
+    if grep -q "BlueprintFramework" "$PANEL_DIR/config/app.php" 2>/dev/null; then
+        sed -i '/BlueprintFramework/d' "$PANEL_DIR/config/app.php" 2>/dev/null || true
+    fi
+    
+    composer dump-autoload --no-scripts -q 2>/dev/null || true
+    php artisan package:discover >/dev/null 2>&1 || true
+    php artisan clear-compiled >/dev/null 2>&1 || true
+    rm -rf "$PANEL_DIR/bootstrap/cache/"*.php 2>/dev/null || true
+    
+    ok "Blueprint uninstalled successfully."
+}
 
-# Run blueprint.sh
-bash $PTERODACTYL_DIRECTORY/blueprint.sh
+blueprint_info_menu() {
+    clear
+    printf "${C_CYAN}================================================${C_RESET}\n"
+    printf "${C_CYAN}           BLUEPRINT INFO${C_RESET}\n"
+    printf "${C_CYAN}================================================${C_RESET}\n\n"
+    
+    printf "Panel Directory : %s\n" "$PANEL_DIR"
+    printf "Blueprint File  : %s\n" "$([[ -f "$PANEL_DIR/blueprint.sh" ]] && echo "EXISTS" || echo "MISSING")"
+    printf "Config File     : %s\n" "$([[ -f "$PANEL_DIR/.blueprintrc" ]] && echo "EXISTS" || echo "MISSING")"
+    printf "CLI Registered  : %s\n" "$(php artisan list 2>/dev/null | grep -q "blueprint:install" && echo "YES" || echo "NO")"
+    printf "Blueprint Ver   : %s\n" "$(blueprint_version)"
+    printf "Panel Ver       : %s\n" "$(panel_version)"
+    printf "Node.js         : %s\n" "$(node --version 2>/dev/null || echo "Missing")"
+    printf "Yarn            : %s\n" "$(yarn --version 2>/dev/null || echo "Missing")"
+    printf "PHP             : %s\n" "$(php --version 2>/dev/null | head -n1 || echo "Missing")"
+    printf "Composer        : %s\n" "$(composer --version 2>/dev/null || echo "Missing")"
+    echo
+    pause
+}
+
 # ==========================================
 # REAL EXTENSION LOGIC
 # ==========================================
@@ -188,7 +264,7 @@ install_ext() {
     
     cd "$PANEL_DIR" || return 1
     
-    fix_sagatrashbin
+    fix_panel_issues
     
     if ! php artisan list 2>/dev/null | grep -q "blueprint:install"; then
         err "Blueprint CLI register nahi hai. Pehle [1] Blueprint -> Reinstall karein."
@@ -200,7 +276,7 @@ install_ext() {
     else
         if grep -q "sagatrashbin" /tmp/install_ext.log; then
             warn "Detected sagatrashbin issue. Running Deep Fix..."
-            fix_sagatrashbin
+            fix_panel_issues
             if php artisan blueprint:install "$tmp_file" >> /tmp/install_ext.log 2>&1; then
                 ok "Installed $ext_name successfully (after fix)."
             else
@@ -269,9 +345,9 @@ playtely_extensions_menu() {
 
     while true; do
         clear 2>/dev/null || true
-        printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
-        printf "${C_CYAN}║${C_RESET}                     ${C_PINK}Ziro.dev CONTROL HUB${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
-        printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+        printf "${C_CYAN}================================================================${C_RESET}\n"
+        printf "${C_CYAN}|                    ${C_PINK}Ziro.dev CONTROL HUB${C_RESET}                    ${C_CYAN}|${C_RESET}\n"
+        printf "${C_CYAN}================================================================${C_RESET}\n\n"
 
         local half=$(( (${#extensions[@]} + 1) / 2 ))
         for ((i=0; i<half; i++)); do
@@ -283,7 +359,7 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            local status1="○"; local status_col1="${C_RED}"
+            local status1="O"; local status_col1="${C_RED}"
             if [[ -d "$PANEL_DIR/extensions/$name1" ]] || \
                [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]] || \
                [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || \
@@ -301,7 +377,7 @@ playtely_extensions_menu() {
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
                 
-                local status2="○"; local status_col2="${C_RED}"
+                local status2="O"; local status_col2="${C_RED}"
                 if [[ -d "$PANEL_DIR/extensions/$name2" ]] || \
                    [[ -f "$PANEL_DIR/extensions/$name2.blueprint" ]] || \
                    [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || \
@@ -334,7 +410,7 @@ playtely_extensions_menu() {
                             if [ "$id" == "$sel" ]; then install_ext "$id" "$name" || true; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
+                    echo -e "\n${C_GREEN}Process completed!${C_RESET}"; pause
                 fi
                 ;;
             "r"|"R")
@@ -346,7 +422,7 @@ playtely_extensions_menu() {
                             if [ "$id" == "$sel" ]; then remove_ext "$id" "$name" || true; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
+                    echo -e "\n${C_GREEN}Process completed!${C_RESET}"; pause
                 fi
                 ;;
             *)
@@ -380,26 +456,26 @@ playtely_extensions_menu() {
 playtely_theme_menu() {
     while true; do
         clear 2>/dev/null || true
-        printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
-        printf "${C_CYAN}║${C_RESET}                       ${C_PINK}CONTROL PANEL UI${C_RESET}                       ${C_CYAN}║${C_RESET}\n"
-        printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+        printf "${C_CYAN}================================================================${C_RESET}\n"
+        printf "${C_CYAN}|                      ${C_PINK}CONTROL PANEL UI${C_RESET}                      ${C_CYAN}|${C_RESET}\n"
+        printf "${C_CYAN}================================================================${C_RESET}\n\n"
         
         if detect_blueprint; then printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
-        else printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}○ OFFLINE${C_RESET}\n\n"; fi
+        else printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}O OFFLINE${C_RESET}\n\n"; fi
         
         printf "  ${C_GREEN}[1]${C_RESET} ${C_CYAN}Blueprint${C_RESET}\n"
         printf "  ${C_GREEN}[2]${C_RESET} ${C_CYAN}Theme${C_RESET}\n"
         printf "  ${C_GREEN}[3]${C_RESET} ${C_CYAN}Extensions${C_RESET}\n\n"
         printf "  ${C_RED}[0]${C_RESET} ${C_RED}Exit${C_RESET}\n\n"
-        read -r -p " ${C_GREEN}▶ Select Option :${C_RESET} " t_choice || return
+        read -r -p " ${C_GREEN}Select Option :${C_RESET} " t_choice || return
         
         case "$t_choice" in
             1) 
                 while true; do
                     clear 2>/dev/null || true
-                    printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
-                    printf "${C_CYAN}║${C_RESET}                       ${C_PINK}CONTROL PANEL UI${C_RESET}                       ${C_CYAN}║${C_RESET}\n"
-                    printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+                    printf "${C_CYAN}================================================================${C_RESET}\n"
+                    printf "${C_CYAN}|                      ${C_PINK}CONTROL PANEL UI${C_RESET}                      ${C_CYAN}|${C_RESET}\n"
+                    printf "${C_CYAN}================================================================${C_RESET}\n\n"
                     printf " ${C_CYAN}BLUEPRINT PANEL${C_RESET}\n"
                     if detect_blueprint; then
                         printf " ${C_CYAN}Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
@@ -409,7 +485,7 @@ playtely_theme_menu() {
                         printf " ${C_GREEN}[4]${C_RESET} ${C_CYAN}Version${C_RESET}\n"
                         printf " ${C_RED}[5]${C_RESET} ${C_RED}Uninstall${C_RESET}\n"
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
-                        read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
+                        read -r -p " ${C_GREEN}Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
                             1) install_blueprint; pause ;;
                             2) update_blueprint; pause ;;
@@ -423,7 +499,7 @@ playtely_theme_menu() {
                         printf " ${C_CYAN}Status :${C_RESET} ${C_RED}● OFFLINE${C_RESET}\n\n"
                         printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Install${C_RESET}\n"
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
-                        read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
+                        read -r -p " ${C_GREEN}Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
                             1) install_blueprint; pause ;;
                             0) break ;;
