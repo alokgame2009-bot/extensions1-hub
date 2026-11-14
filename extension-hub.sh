@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.3 - Fixed Status & Cleaned Code
+# Extension Hub v1.4 - Fully Working (Real Status Check)
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.3"
+APP_VERSION="v1.4"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -122,7 +122,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Fixed Status)
+# EXTENSIONS GRID MENU (Fixed Status Check)
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -148,6 +148,12 @@ playtely_extensions_menu() {
     declare -a selected_extensions=()
 
     while true; do
+        # Fetch real installed list
+        local installed_list=""
+        if [[ -d "$PANEL_DIR" ]]; then
+            installed_list=$(cd "$PANEL_DIR" && php artisan blueprint:list 2>/dev/null | grep -Eo '^[a-zA-Z0-9_]+' || echo "")
+        fi
+
         clear 2>/dev/null || true
         
         # Header
@@ -166,9 +172,9 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Status Check Left
+            # Status Check Left (Database list check)
             local status1="○"; local status_col1="${C_RED}"
-            if [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || [[ -d "$PANEL_DIR/extensions/$name1" ]]; then
+            if echo "$installed_list" | grep -qi "^${name1}$"; then
                 status1="●"; status_col1="${C_GREEN}"
             fi
             
@@ -184,7 +190,7 @@ playtely_extensions_menu() {
                 
                 # Status Check Right
                 local status2="○"; local status_col2="${C_RED}"
-                if [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || [[ -d "$PANEL_DIR/extensions/$name2" ]]; then
+                if echo "$installed_list" | grep -qi "^${name2}$"; then
                     status2="●"; status_col2="${C_GREEN}"
                 fi
                 
