@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.6 - Fully Fixed with DB Check
+# Extension Hub v1.0 - Ultimate Status Check
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.6"
+APP_VERSION="v1.0"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -122,7 +122,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Bulletproof Status Check)
+# EXTENSIONS GRID MENU (Ultimate 5-Layer Status Check)
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -148,24 +148,30 @@ playtely_extensions_menu() {
     declare -a selected_extensions=()
 
     while true; do
-        # Har baar fresh check karein
+        # 5-LAYER INSTALLED LIST FETCH
         local installed_list=""
         if [[ -d "$PANEL_DIR" ]]; then
-            # 1. Blueprint CLI se try karein
+            # Layer 1: blueprint:list
             installed_list=$(cd "$PANEL_DIR" && php artisan blueprint:list 2>/dev/null | grep -Eo '^[a-zA-Z0-9_]+' || true)
             
-            # 2. Database se try karein
+            # Layer 2: Database (extensions table)
             if [[ -z "$installed_list" ]]; then
-                installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="try { echo \App\BlueprintFramework\Blueprint::getInstalledExtensions()->pluck('name')->implode(' '); } catch(\Exception \$e) {}" 2>/dev/null || true)
+                installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="try { echo \DB::table('extensions')->pluck('name')->implode(' '); } catch(\Exception \$e) {}" 2>/dev/null || true)
             fi
             
-            # 3. Files folder se try karein
+            # Layer 3: Database (blueprint_extensions table)
             if [[ -z "$installed_list" ]]; then
-                installed_list=$(ls -1 "$PANEL_DIR/extensions/" 2>/dev/null || true)
+                installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="try { echo \DB::table('blueprint_extensions')->pluck('name')->implode(' '); } catch(\Exception \$e) {}" 2>/dev/null || true)
             fi
             
+            # Layer 4: Files in extensions folder
             if [[ -z "$installed_list" ]]; then
-                installed_list=$(ls -1 "$PANEL_DIR/app/Extensions/" 2>/dev/null || true)
+                installed_list=$(ls -1 "$PANEL_DIR/extensions/" 2>/dev/null | grep -v '^$' | tr '\n' ' ' || true)
+            fi
+            
+            # Layer 5: Files in app/Extensions folder
+            if [[ -z "$installed_list" ]]; then
+                installed_list=$(ls -1 "$PANEL_DIR/app/Extensions/" 2>/dev/null | grep -v '^$' | tr '\n' ' ' || true)
             fi
         fi
 
@@ -187,7 +193,7 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Status Check Left (Grep check on installed_list)
+            # Status Check Left
             local status1="○"; local status_col1="${C_RED}"
             if echo "$installed_list" | grep -qi "${name1}"; then
                 status1="●"; status_col1="${C_GREEN}"
