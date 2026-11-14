@@ -92,9 +92,18 @@ get_current_user() { echo "${USER:-root}"; }
 # ==========================================
 install_blueprint() {
     need_root || return 1
-    if detect_blueprint; then warn "Blueprint is already installed."; return 1; fi
-    echo; warn "This will install Blueprint Framework into: $PANEL_DIR"
-    read -r -p "Continue? [y/N]: " answer; [[ "$answer" =~ ^[Yy]$ ]] || return 0
+    
+    # Agar already installed hai toh reinstall karein
+    if detect_blueprint; then
+        warn "Blueprint already installed. Reinstalling to register commands..."
+        read -r -p "Reinstall? [y/N]: " answer
+        [[ "$answer" =~ ^[Yy]$ ]] || return 0
+    else
+        echo; warn "This will install Blueprint Framework into: $PANEL_DIR"
+        read -r -p "Continue? [y/N]: " answer
+        [[ "$answer" =~ ^[Yy]$ ]] || return 0
+    fi
+    
     info "Step 1/5: Installing dependencies (Node.js, Yarn, etc)..."
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git unzip wget zip
@@ -105,22 +114,43 @@ install_blueprint() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
     if ! command -v yarn >/dev/null 2>&1; then npm install --global yarn >/dev/null 2>&1; fi
     ok "Dependencies installed."
+    
     info "Step 2/5: Downloading latest Blueprint release..."
     TMP_DIR="$(mktemp -d)"
     if ! curl -fL --retry 3 "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -o "$TMP_DIR/release.zip"; then err "Failed to download Blueprint."; return 1; fi
+    
     info "Step 3/5: Extracting files into panel..."
     cd "$PANEL_DIR" || return 1
     cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
     unzip -o release.zip >/dev/null
     rm -f release.zip
+    
     info "Step 4/5: Installing Yarn packages (This may take a while)..."
     yarn install --silent >/dev/null 2>&1 || yarn install
+    
     info "Step 5/5: Running Blueprint setup script..."
     chmod +x "$PANEL_DIR/blueprint.sh"
     cd "$PANEL_DIR" && bash ./blueprint.sh
+    
     chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
     fix_sagatrashbin
-    if detect_blueprint; then ok "Blueprint installed successfully!"; else err "Installation finished but verification failed."; fi
+    
+    # Verify
+    if php artisan list 2>/dev/null | grep -q "blueprint:install"; then
+        ok "Blueprint registered successfully! You can now install extensions."
+    elif detect_blueprint; then
+        warn "Blueprint files exist but CLI not registered. Trying manual register..."
+        php artisan package:discover --ansi >/dev/null 2>&1 || true
+        composer dump-autoload --no-scripts -q 2>/dev/null || true
+        php artisan clear-compiled >/dev/null 2>&1 || true
+        if php artisan list 2>/dev/null | grep -q "blueprint:install"; then
+            ok "Blueprint registered after manual fix!"
+        else
+            err "Blueprint CLI still not registered. Check /var/www/pterodactyl/config/app.php"
+        fi
+    else
+        err "Installation finished but verification failed."
+    fi
 }
 
 # ==========================================
