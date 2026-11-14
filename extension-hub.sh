@@ -122,7 +122,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Fixed for Polymart/extension_cached_metadata)
+# EXTENSIONS GRID MENU (Final - File Based Check)
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -148,12 +148,6 @@ playtely_extensions_menu() {
     declare -a selected_extensions=()
 
     while true; do
-        # FETCH INSTALLED EXTENSIONS FROM extension_cached_metadata TABLE
-        local installed_list=""
-        if [[ -d "$PANEL_DIR" ]]; then
-            installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="try { echo DB::table('extension_cached_metadata')->pluck('name')->implode(' '); } catch(\Exception \$e) {}" 2>/dev/null || true)
-        fi
-
         clear 2>/dev/null || true
         
         # Header
@@ -172,9 +166,15 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Status Check Left
+            # Status Check Left (File/Folder check - Nobita Cloud style)
             local status1="○"; local status_col1="${C_RED}"
-            if echo "$installed_list" | grep -qi "${name1}"; then
+            # Check in all possible locations
+            if [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || \
+               [[ -f "$PANEL_DIR/app/Extensions/$name1.php" ]] || \
+               [[ -d "$PANEL_DIR/extensions/$name1" ]] || \
+               [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]] || \
+               [[ -d "$PANEL_DIR/$name1" ]] || \
+               [[ -f "$PANEL_DIR/app/Extensions/Themes/$name1" ]]; then
                 status1="●"; status_col1="${C_GREEN}"
             fi
             
@@ -190,7 +190,12 @@ playtely_extensions_menu() {
                 
                 # Status Check Right
                 local status2="○"; local status_col2="${C_RED}"
-                if echo "$installed_list" | grep -qi "${name2}"; then
+                if [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || \
+                   [[ -f "$PANEL_DIR/app/Extensions/$name2.php" ]] || \
+                   [[ -d "$PANEL_DIR/extensions/$name2" ]] || \
+                   [[ -f "$PANEL_DIR/extensions/$name2.blueprint" ]] || \
+                   [[ -d "$PANEL_DIR/$name2" ]] || \
+                   [[ -f "$PANEL_DIR/app/Extensions/Themes/$name2" ]]; then
                     status2="●"; status_col2="${C_GREEN}"
                 fi
                 
