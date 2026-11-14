@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v3.0 - Full Working
+# Extension Hub v3.1 - Fixed
 set -Eeuo
 
 APP_NAME="Extension Hub"
-APP_VERSION="v3.0"
+APP_VERSION="v3.1"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -102,13 +102,16 @@ install_blueprint() {
         [[ "$answer" =~ ^[Yy]$ ]] || return 0
     fi
     
+    info "Fixing Node.js repository conflict..."
+    rm -f /etc/apt/keyrings/nodesource.gpg /usr/share/keyrings/nodesource.gpg /etc/apt/sources.list.d/nodesource.list 2>/dev/null || true
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg 2>/dev/null
+    chmod 644 /etc/apt/keyrings/nodesource.gpg
+    echo 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
+    
     info "Step 1/5: Installing dependencies..."
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git unzip wget zip
-    install -d -m 0755 /etc/apt/keyrings
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg 2>/dev/null
-    echo 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
-    apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
     if ! command -v yarn >/dev/null 2>&1; then npm install --global yarn >/dev/null 2>&1; fi
     ok "Dependencies installed."
@@ -200,7 +203,6 @@ uninstall_blueprint() {
     rm -rf "$PANEL_DIR/app/BlueprintFramework"
     rm -rf "$PANEL_DIR/.blueprint"
     
-    # Remove service provider from config
     if grep -q "BlueprintFramework" "$PANEL_DIR/config/app.php" 2>/dev/null; then
         sed -i '/BlueprintFramework/d' "$PANEL_DIR/config/app.php" 2>/dev/null || true
     fi
@@ -443,7 +445,7 @@ playtely_extensions_menu() {
 }
 
 # ==========================================
-# THEME MENU - FULLY WORKING
+# THEME MENU
 # ==========================================
 playtely_theme_menu() {
     while true; do
