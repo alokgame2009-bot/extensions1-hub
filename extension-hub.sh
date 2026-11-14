@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.1 - Final Combined Version
+# Extension Hub v1.2 - Final Combined Version
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.1"
+APP_VERSION="v1.2"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -53,6 +53,38 @@ get_network_status() { if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "$
 get_uptime() { uptime -p 2>/dev/null | sed 's/up //; s/ weeks/ weeks,/; s/ days/ days,/' || echo "Unknown"; }
 get_disk_usage() { df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"; }
 get_current_user() { echo "${USER:-root}"; }
+
+# ==========================================
+# EXTENSION STATUS CHECK (Database + Files)
+# ==========================================
+extension_is_installed() {
+    local name="$1" root="$PANEL_DIR"
+    
+    if [[ -d "$root" ]]; then
+        local db_check
+        db_check=$(cd "$root" && php artisan tinker --execute="
+            try {
+                if (Schema::hasTable('extensions')) {
+                    echo DB::table('extensions')->where('name', '$name')->count();
+                } elseif (Schema::hasTable('blueprint_extensions')) {
+                    echo DB::table('blueprint_extensions')->where('name', '$name')->count();
+                }
+            } catch(\Exception \$e) { echo 0; }
+        " 2>/dev/null | tail -1)
+        
+        if [[ "$db_check" != "0" && -n "$db_check" ]]; then
+            return 0
+        fi
+    fi
+    
+    [[ -d "$root/.blueprint/extensions/$name" ]] && return 0
+    [[ -d "$root/app/Extensions/$name" ]] && return 0
+    [[ -f "$root/app/Extensions/$name.php" ]] && return 0
+    [[ -d "$root/extensions/$name" ]] && return 0
+    [[ -f "$root/extensions/$name.blueprint" ]] && return 0
+    
+    return 1
+}
 
 # ==========================================
 # REAL BLUEPRINT INSTALL
@@ -120,7 +152,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Purana Wala)
+# EXTENSIONS GRID MENU
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -159,7 +191,7 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             local status1="○"; local status_col1="${C_RED}"
-            if [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || [[ -f "$PANEL_DIR/app/Extensions/$name1.php" ]] || [[ -d "$PANEL_DIR/extensions/$name1" ]] || [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]]; then status1="●"; status_col1="${C_GREEN}"; fi
+            if extension_is_installed "$name1"; then status1="●"; status_col1="${C_GREEN}"; fi
             printf " ${col1}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col1}%s${C_RESET}" "$sel1" "$id1" "$name1" "$status1"
             if [ "$right_index" -lt "${#extensions[@]}" ]; then
                 IFS='|' read -r id2 name2 <<< "${extensions[$right_index]}"
@@ -168,7 +200,7 @@ playtely_extensions_menu() {
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
                 local status2="○"; local status_col2="${C_RED}"
-                if [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || [[ -f "$PANEL_DIR/app/Extensions/$name2.php" ]] || [[ -d "$PANEL_DIR/extensions/$name2" ]] || [[ -f "$PANEL_DIR/extensions/$name2.blueprint" ]]; then status2="●"; status_col2="${C_GREEN}"; fi
+                if extension_is_installed "$name2"; then status2="●"; status_col2="${C_GREEN}"; fi
                 printf "   ${col2}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col2}%s${C_RESET}" "$sel2" "$id2" "$name2" "$status2"
             fi
             echo ""
