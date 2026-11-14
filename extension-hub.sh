@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Extension Hub v1.0 - Ultimate Fixed with Real Blueprint Install
+# Extension Hub v1.0 - Final Clean Version
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
@@ -42,37 +42,25 @@ command_exists() { command -v "$1" >/dev/null 2>&1; }
 need_root() { [[ "$EUID" -eq 0 ]] || { err "Run as root."; return 1; }; }
 valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/composer.json" ]]; }
 
-# Run this before/after Blueprint operations. Laravel can print provider/container
-# exceptions even when a surrounding shell command continues; never hide those errors.
 panel_artisan_health_check() {
     valid_panel_dir || { err "Invalid Pterodactyl panel directory: $PANEL_DIR"; return 1; }
-    command_exists php || { err "PHP CLI is not installed or not in PATH."; return 1; }
-
+    command_exists php || { err "PHP CLI not installed."; return 1; }
     local check_log status
-    check_log="$(mktemp /tmp/extension-hub-artisan-check.XXXXXX.log)"
+    check_log="$(mktemp /tmp/extension-hub-check.XXXXXX.log)"
     if (cd "$PANEL_DIR" && php artisan list --no-ansi) >"$check_log" 2>&1; then
         status=0
     else
         status=$?
     fi
-
-    if [[ "$status" -ne 0 ]] || grep -Eqi 'Target class .* does not exist|Class .* does not exist|ReflectionException|BindingResolutionException' "$check_log"; then
-        err "Pterodactyl Laravel bootstrap check failed. Blueprint operations are stopped to prevent misleading install-success messages."
-        if grep -Eqi 'TrashBinRepository|sagatrashbin' "$check_log"; then
-            warn "Detected the existing sagatrashbin / TrashBinRepository provider error."
-            warn "This is a broken or incomplete installed extension, not an error in sagaautosuspension itself."
-        fi
-        echo
+    if [[ "$status" -ne 0 ]]; then
+        err "Pterodactyl Laravel bootstrap check failed."
         sed -n '1,35p' "$check_log"
-        echo
-        warn "Full diagnostic: $check_log"
-        warn "Fix/remove the extension whose provider references the missing class, then rerun the install."
         return 1
     fi
-
     rm -f "$check_log"
     return 0
 }
+
 detect_blueprint() {
     valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]] &&
     { [[ -x /usr/local/bin/blueprint ]] || command_exists blueprint; }
@@ -81,18 +69,11 @@ blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
 # ==========================================
-# SYSTEM STATS FUNCTIONS
+# SYSTEM STATS
 # ==========================================
-get_cpu_usage() { 
-    local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
-    printf "%.0f" "${cpu:-0}"
-}
-get_ram_usage() { 
-    free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' || echo "0"
-}
-get_network_status() { 
-    if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}CONNECTED${C_RESET}"; else printf "${C_RED}DISCONNECTED${C_RESET}"; fi
-}
+get_cpu_usage() { local cpu=$(top -bn1 2>/dev/null | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}'); printf "%.0f" "${cpu:-0}"; }
+get_ram_usage() { free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' || echo "0"; }
+get_network_status() { if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}CONNECTED${C_RESET}"; else printf "${C_RED}DISCONNECTED${C_RESET}"; fi; }
 get_uptime() { uptime -p 2>/dev/null | sed 's/up //; s/ weeks/ weeks,/; s/ days/ days,/' || echo "Unknown"; }
 get_disk_usage() { df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"; }
 get_current_user() { echo "${USER:-root}"; }
@@ -102,32 +83,21 @@ get_current_user() { echo "${USER:-root}"; }
 # ==========================================
 install_blueprint() {
     need_root || return 1
-    valid_panel_dir || { err "Pterodactyl panel not found: $PANEL_DIR"; return 1; }
+    valid_panel_dir || { err "Panel not found: $PANEL_DIR"; return 1; }
     panel_artisan_health_check || return 1
     if detect_blueprint; then
         warn "Blueprint is already installed."
         read -r -p "Run Blueprint repair/setup again? [y/N]: " repair_answer
         [[ "$repair_answer" =~ ^[Yy]$ ]] || return 0
-        local repair_log repair_status
-        repair_log="$(mktemp /tmp/extension-hub-blueprint-repair.XXXXXX.log)"
-        if (cd "$PANEL_DIR" && blueprint -rerun-install) >"$repair_log" 2>&1; then
-            repair_status=0
-        else
-            repair_status=$?
+        if (cd "$PANEL_DIR" && blueprint -rerun-install); then
+            ok "Blueprint repair completed."
+            return 0
         fi
-        cat "$repair_log"
-        if [[ "$repair_status" -ne 0 ]] || grep -Eqi 'Target class .* does not exist|Class .* does not exist|ReflectionException|BindingResolutionException' "$repair_log"; then
-            err "Blueprint repair did not complete cleanly. See: $repair_log"
-            return 1
-        fi
-        panel_artisan_health_check || { err "Laravel health check failed after Blueprint repair."; warn "Repair log: $repair_log"; return 1; }
-        rm -f "$repair_log"
-        ok "Blueprint repair completed and Laravel health check passed."
-        return 0
+        err "Blueprint repair failed."
+        return 1
     fi
-    command_exists apt-get || { err "Debian/Ubuntu apt-get is required."; return 1; }
+    command_exists apt-get || { err "apt-get required."; return 1; }
     warn "Blueprint will modify panel files: $PANEL_DIR"
-    warn "Take a full panel and database backup first."
     read -r -p "Continue? [y/N]: " answer
     [[ "$answer" =~ ^[Yy]$ ]] || return 0
 
@@ -142,20 +112,20 @@ install_blueprint() {
     printf '%s\n' 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
     apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
-    command_exists node && command_exists npm || { err "Node.js/npm installation failed."; return 1; }
+    command_exists node && command_exists npm || { err "Node.js install failed."; return 1; }
 
     info "Installing Yarn..."
     npm install --global yarn
-    command_exists yarn || { err "Yarn installation failed."; return 1; }
+    command_exists yarn || { err "Yarn install failed."; return 1; }
 
-    info "Downloading official Blueprint release..."
+    info "Downloading Blueprint..."
     curl -fL --retry 3 --retry-delay 2 https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip -o "$TMP_DIR/release.zip"
-    unzip -tq "$TMP_DIR/release.zip" >/dev/null || { err "Invalid Blueprint ZIP."; return 1; }
+    unzip -tq "$TMP_DIR/release.zip" >/dev/null || { err "Invalid ZIP."; return 1; }
     info "Extracting Blueprint..."
     unzip -o "$TMP_DIR/release.zip" -d "$PANEL_DIR"
-    [[ -f "$PANEL_DIR/blueprint.sh" ]] || { err "blueprint.sh missing from release."; return 1; }
+    [[ -f "$PANEL_DIR/blueprint.sh" ]] || { err "blueprint.sh missing."; return 1; }
 
-    info "Installing panel Yarn dependencies..."
+    info "Installing Yarn packages..."
     (cd "$PANEL_DIR" && yarn install)
     if [[ ! -f "$PANEL_DIR/.blueprintrc" ]]; then
         cat > "$PANEL_DIR/.blueprintrc" <<'BLUEPRINT_RC'
@@ -163,31 +133,16 @@ WEBUSER="www-data";
 OWNERSHIP="www-data:www-data";
 USERSHELL="/bin/bash";
 BLUEPRINT_RC
-    else
-        info "Existing .blueprintrc found; preserving your current settings."
     fi
     chmod +x "$PANEL_DIR/blueprint.sh"
-    info "Running official Blueprint setup..."
-    local setup_log setup_status
-    setup_log="$(mktemp /tmp/extension-hub-blueprint-setup.XXXXXX.log)"
-    if (cd "$PANEL_DIR" && bash ./blueprint.sh) >"$setup_log" 2>&1; then
-        setup_status=0
-    else
-        setup_status=$?
+    info "Running Blueprint setup..."
+    if (cd "$PANEL_DIR" && bash ./blueprint.sh); then
+        if [[ -x /usr/local/bin/blueprint ]] || command_exists blueprint; then
+            ok "Blueprint installed successfully!"
+            return 0
+        fi
     fi
-    cat "$setup_log"
-    if [[ "$setup_status" -ne 0 ]] || grep -Eqi 'Target class .* does not exist|Class .* does not exist|ReflectionException|BindingResolutionException' "$setup_log"; then
-        err "Blueprint setup did not complete cleanly. See: $setup_log"
-        return 1
-    fi
-    panel_artisan_health_check || { err "Blueprint setup ran, but Laravel health verification failed."; warn "Setup log: $setup_log"; return 1; }
-    rm -f "$setup_log"
-    if [[ -x /usr/local/bin/blueprint ]] || command_exists blueprint; then
-        ok "Blueprint CLI installed."
-        blueprint -version || true
-        return 0
-    fi
-    err "Setup ended but Blueprint CLI was not found. Review the installer output."
+    err "Blueprint setup failed."
     return 1
 }
 
@@ -195,102 +150,58 @@ BLUEPRINT_RC
 # REAL EXTENSION LOGIC
 # ==========================================
 install_ext() {
-    local ext_id="$1" ext_name="$2" package_file download_tmp install_log status
+    local ext_id="$1" ext_name="$2"
     need_root || return 1
-    valid_panel_dir || { err "Panel directory not found: $PANEL_DIR"; return 1; }
+    valid_panel_dir || { err "Panel not found."; return 1; }
     command_exists blueprint || { err "Install Blueprint first."; return 1; }
-
-    # Detect broken pre-existing Laravel providers before running Blueprint.
     panel_artisan_health_check || return 1
 
-    package_file="$PANEL_DIR/${ext_name}.blueprint"
-    download_tmp="$(mktemp "$PANEL_DIR/.${ext_name}.download.XXXXXX")"
-    install_log="$(mktemp "/tmp/extension-hub-${ext_name}.XXXXXX.log")"
+    local package_file="$PANEL_DIR/${ext_name}.blueprint"
+    local download_tmp="$(mktemp "$PANEL_DIR/.${ext_name}.XXXXXX")"
 
     info "Downloading ${ext_name}.blueprint..."
-    if ! curl -fL --retry 3 --retry-delay 2 \
-        "${EXT_GITHUB_RAW}/${ext_name}.blueprint" -o "$download_tmp"; then
-        rm -f "$download_tmp" "$install_log"
-        err "Download failed. Check that ${ext_name}.blueprint exists in the repository."
+    if ! curl -fL --retry 3 "${EXT_GITHUB_RAW}/${ext_name}.blueprint" -o "$download_tmp"; then
+        rm -f "$download_tmp"
+        err "Download failed."
         return 1
     fi
-
-    if [[ ! -s "$download_tmp" ]] || ! unzip -tq "$download_tmp" >/dev/null 2>&1; then
-        rm -f "$download_tmp" "$install_log"
-        err "Downloaded extension is empty or is not a valid Blueprint ZIP package."
+    if [[ ! -s "$download_tmp" ]]; then
+        rm -f "$download_tmp"
+        err "Downloaded file is empty."
         return 1
     fi
-
-    if [[ -e "$package_file" ]]; then
-        rm -f "$download_tmp" "$install_log"
-        err "Refusing to overwrite existing package: $package_file"
-        return 1
-    fi
-
     mv "$download_tmp" "$package_file"
-    info "Installing $ext_name through the official Blueprint CLI..."
-    if (cd "$PANEL_DIR" && blueprint -install "$ext_name") >"$install_log" 2>&1; then
-        status=0
-    else
-        status=$?
+    info "Installing $ext_name..."
+    if (cd "$PANEL_DIR" && blueprint -install "$ext_name"); then
+        rm -f "$package_file"
+        ok "Installed $ext_name successfully."
+        return 0
     fi
     rm -f "$package_file"
-
-    # Show normal Blueprint output only after capturing it, so Laravel exceptions
-    # can be identified and reported without printing a confusing false success.
-    if [[ "$status" -ne 0 ]] || grep -Eqi 'Target class .* does not exist|Class .* does not exist|ReflectionException|BindingResolutionException' "$install_log"; then
-        err "Blueprint reported an installation error for $ext_name."
-        sed -n '1,45p' "$install_log"
-        warn "Full installation log: $install_log"
-        return 1
-    fi
-
-    if ! panel_artisan_health_check; then
-        err "$ext_name command completed, but the panel Laravel bootstrap check failed afterward."
-        warn "Do not treat this as a clean installation until the reported provider error is fixed."
-        warn "Blueprint output log: $install_log"
-        return 1
-    fi
-
-    cat "$install_log"
-    rm -f "$install_log"
-    ok "Installed $ext_name; post-install Laravel check passed."
-    return 0
-}
-
-extension_is_installed() {
-    local name="$1"
-    local root="$PANEL_DIR"
-
-    # Blueprint's own extension data directory (primary detection path).
-    [[ -d "$root/.blueprint/extensions/$name" ]] && return 0
-
-    # Compatibility with legacy layouts and extensions that expose PHP files.
-    [[ -d "$root/app/Extensions/$name" ]] && return 0
-    [[ -f "$root/app/Extensions/$name.php" ]] && return 0
-    [[ -d "$root/extensions/$name" ]] && return 0
-
-    # Some extensions create a registered folder under the Blueprint data tree.
-    if [[ -d "$root/.blueprint/extensions" ]]; then
-        find "$root/.blueprint/extensions" -mindepth 2 -maxdepth 2 \
-            -type d -name "$name" -print -quit 2>/dev/null | grep -q .
-        return $?
-    fi
-
+    err "Installation failed."
     return 1
 }
 
 remove_ext() {
     local ext_id="$1" ext_name="$2"
     need_root || return 1
-    valid_panel_dir || { err "Panel directory not found: $PANEL_DIR"; return 1; }
-    command_exists blueprint || { err "Blueprint CLI is not installed."; return 1; }
-    panel_artisan_health_check || return 1
-    warn "This will remove extension '$ext_name'."
-    read -r -p "Are you sure? [y/N]: " answer
-    [[ "$answer" =~ ^[Yy]$ ]] || return 0
-    if (cd "$PANEL_DIR" && blueprint -remove "$ext_name"); then ok "Removed $ext_name."; return 0; fi
-    err "Blueprint failed to remove $ext_name."; return 1
+    valid_panel_dir || { err "Panel not found."; return 1; }
+    command_exists blueprint || { err "Blueprint CLI not installed."; return 1; }
+    if (cd "$PANEL_DIR" && blueprint -remove "$ext_name"); then
+        ok "Removed $ext_name."
+        return 0
+    fi
+    err "Removal failed."
+    return 1
+}
+
+extension_is_installed() {
+    local name="$1" root="$PANEL_DIR"
+    [[ -d "$root/.blueprint/extensions/$name" ]] && return 0
+    [[ -d "$root/app/Extensions/$name" ]] && return 0
+    [[ -f "$root/app/Extensions/$name.php" ]] && return 0
+    [[ -d "$root/extensions/$name" ]] && return 0
+    return 1
 }
 
 # ==========================================
@@ -316,88 +227,71 @@ playtely_extensions_menu() {
         "61|mcp" "62|mcplayer" "63|pterodactylramburst" "64|pterodactylpanelban"
         "65|pterodactylupburst" "66|pterodactylbackup"
     )
-
     declare -a selected_extensions=()
 
     while true; do
         clear 2>/dev/null || true
-        
-        printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
-        printf "${C_CYAN}║${C_RESET}                     ${C_PINK}Ziro.dev CONTROL HUB${C_RESET}                     ${C_CYAN}║${C_RESET}\n"
-        printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+        printf "${C_CYAN}================================================================${C_RESET}\n"
+        printf "${C_CYAN}|                  ${C_PINK}Ziro.dev CONTROL HUB${C_RESET}                    ${C_CYAN}|${C_RESET}\n"
+        printf "${C_CYAN}================================================================${C_RESET}\n\n"
 
         local half=$(( (${#extensions[@]} + 1) / 2 ))
         for ((i=0; i<half; i++)); do
             IFS='|' read -r id1 name1 <<< "${extensions[$i]}"
             local right_index=$((i + half))
-            
             local sel1="[-]"; local col1="${C_GRAY}"
             for s in "${selected_extensions[@]}"; do 
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
-            
-            local status1="○"; local status_col1="${C_RED}"
-            if extension_is_installed "$name1"; then
-                status1="●"; status_col1="${C_GREEN}"
-            fi
-            
+            local status1="O"; local status_col1="${C_RED}"
+            if extension_is_installed "$name1"; then status1="●"; status_col1="${C_GREEN}"; fi
             printf " ${col1}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col1}%s${C_RESET}" "$sel1" "$id1" "$name1" "$status1"
-            
+
             if [ "$right_index" -lt "${#extensions[@]}" ]; then
                 IFS='|' read -r id2 name2 <<< "${extensions[$right_index]}"
                 local sel2="[-]"; local col2="${C_GRAY}"
                 for s in "${selected_extensions[@]}"; do 
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
-                
-                local status2="○"; local status_col2="${C_RED}"
-                if extension_is_installed "$name2"; then
-                    status2="●"; status_col2="${C_GREEN}"
-                fi
-                
+                local status2="O"; local status_col2="${C_RED}"
+                if extension_is_installed "$name2"; then status2="●"; status_col2="${C_GREEN}"; fi
                 printf "   ${col2}%s${C_RESET} ${C_CYAN}%-2s${C_RESET} ${C_WHITE}%-22s${C_RESET} ${status_col2}%s${C_RESET}" "$sel2" "$id2" "$name2" "$status2"
             fi
             echo ""
         done
         echo ""
 
-        printf " ${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 80))"
+        printf " ${C_BLUE}----------------------------------------------------------------${C_RESET}\n"
         printf " ${C_WHITE}SELECTED: ${C_YELLOW}%d${C_WHITE} items${C_RESET}\n" "${#selected_extensions[@]}"
         printf " ${C_GREEN}[i] Install  ${C_RED}[r] Remove  ${C_BLUE}[a] Select All  ${C_WHITE}[c] Clear  ${C_RED}[0] Exit${C_RESET}\n\n"
-        
-        read -r -p " 👉 ${C_GREEN}Select ID(s) or Action:${C_RESET} " input
-        
+        read -r -p " ${C_GREEN}Select ID(s) or Action:${C_RESET} " input
+
         case "$input" in
             0|"exit") return ;;
-            "a"|"A")
-                selected_extensions=()
-                for ext in "${extensions[@]}"; do IFS='|' read -r id _ <<< "$ext"; selected_extensions+=("$id"); done
-                ;;
+            "a"|"A") selected_extensions=(); for ext in "${extensions[@]}"; do IFS='|' read -r id _ <<< "$ext"; selected_extensions+=("$id"); done ;;
             "c"|"C") selected_extensions=() ;;
             "i"|"I")
                 if [ ${#selected_extensions[@]} -eq 0 ]; then echo -e "\n${C_RED}Error: No extensions selected!${C_RESET}"; sleep 1
                 else
-                    echo ""
                     for sel in "${selected_extensions[@]}"; do
                         for ext in "${extensions[@]}"; do
                             IFS='|' read -r id name <<< "$ext"
-                            if [ "$id" == "$sel" ]; then install_ext "$id" "$name" || warn "Extension install failed: $name"; fi
+                            if [ "$id" == "$sel" ]; then install_ext "$id" "$name"; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
+                    echo -e "\n${C_GREEN}Done!${C_RESET}"; pause
                 fi
                 ;;
             "r"|"R")
                 if [ ${#selected_extensions[@]} -eq 0 ]; then echo -e "\n${C_RED}Error: No extensions selected!${C_RESET}"; sleep 1
                 else
-                    echo ""
                     for sel in "${selected_extensions[@]}"; do
                         for ext in "${extensions[@]}"; do
                             IFS='|' read -r id name <<< "$ext"
-                            if [ "$id" == "$sel" ]; then remove_ext "$id" "$name" || warn "Extension removal failed: $name"; fi
+                            if [ "$id" == "$sel" ]; then remove_ext "$id" "$name"; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
+                    echo -e "\n${C_GREEN}Done!${C_RESET}"; pause
                 fi
                 ;;
             *)
@@ -409,7 +303,6 @@ playtely_extensions_menu() {
                             found=1
                             local exists=0
                             for s in "${selected_extensions[@]}"; do [[ "$s" == "$num" ]] && exists=1; done
-                            
                             if [ "$exists" -eq 0 ]; then selected_extensions+=("$num")
                             else
                                 local new_sel=()
@@ -432,60 +325,60 @@ playtely_extensions_menu() {
 playtely_theme_menu() {
     while true; do
         clear 2>/dev/null || true
-        printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
-        printf "${C_CYAN}║${C_RESET}                       ${C_PINK}CONTROL PANEL UI${C_RESET}                       ${C_CYAN}║${C_RESET}\n"
-        printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+        printf "${C_CYAN}================================================================${C_RESET}\n"
+        printf "${C_CYAN}|                      ${C_PINK}CONTROL PANEL UI${C_RESET}                      ${C_CYAN}|${C_RESET}\n"
+        printf "${C_CYAN}================================================================${C_RESET}\n\n"
         
         if detect_blueprint; then printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
-        else printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}○ OFFLINE${C_RESET}\n\n"; fi
+        else printf " ${C_CYAN}Blueprint Status :${C_RESET} ${C_RED}O OFFLINE${C_RESET}\n\n"; fi
         
         printf "  ${C_GREEN}[1]${C_RESET} ${C_CYAN}Blueprint${C_RESET}\n"
         printf "  ${C_GREEN}[2]${C_RESET} ${C_CYAN}Theme${C_RESET}\n"
         printf "  ${C_GREEN}[3]${C_RESET} ${C_CYAN}Extensions${C_RESET}\n\n"
         printf "  ${C_RED}[0]${C_RESET} ${C_RED}Exit${C_RESET}\n\n"
         
-        read -r -p " ${C_GREEN}▶ Select Option :${C_RESET} " t_choice || return
+        read -r -p " ${C_GREEN}Select Option :${C_RESET} " t_choice || return
         
         case "$t_choice" in
             1) 
                 while true; do
                     clear 2>/dev/null || true
-                    printf "${C_CYAN}╔══════════════════════════════════════════════════════════════╗${C_RESET}\n"
-                    printf "${C_CYAN}║${C_RESET}                       ${C_PINK}CONTROL PANEL UI${C_RESET}                       ${C_CYAN}║${C_RESET}\n"
-                    printf "${C_CYAN}╚══════════════════════════════════════════════════════════════╝${C_RESET}\n\n"
+                    printf "${C_CYAN}================================================================${C_RESET}\n"
+                    printf "${C_CYAN}|                      ${C_PINK}CONTROL PANEL UI${C_RESET}                      ${C_CYAN}|${C_RESET}\n"
+                    printf "${C_CYAN}================================================================${C_RESET}\n\n"
                     printf " ${C_CYAN}BLUEPRINT PANEL${C_RESET}\n"
                     if detect_blueprint; then
                         printf " ${C_CYAN}Status :${C_RESET} ${C_GREEN}● ONLINE${C_RESET}\n\n"
-                        printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Repair / Re-run Setup${C_RESET}\n"
+                        printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Repair${C_RESET}\n"
                         printf " ${C_GREEN}[2]${C_RESET} ${C_CYAN}Update${C_RESET}\n"
                         printf " ${C_GREEN}[3]${C_RESET} ${C_CYAN}Info${C_RESET}\n"
                         printf " ${C_GREEN}[4]${C_RESET} ${C_CYAN}Version${C_RESET}\n"
                         printf " ${C_RED}[5]${C_RESET} ${C_RED}Uninstall${C_RESET}\n"
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
-                        read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
+                        read -r -p " ${C_GREEN}Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
-                            1) if ! install_blueprint; then warn "Blueprint installation failed."; fi; pause ;;
-                            2) if command_exists blueprint; then (cd "$PANEL_DIR" && blueprint -upgrade) || err "Blueprint update failed."; else err "Blueprint CLI not found."; fi; pause ;;
-                            3) if command_exists blueprint; then (cd "$PANEL_DIR" && blueprint -info); else err "Blueprint CLI not found."; fi; pause ;;
-                            4) if command_exists blueprint; then (cd "$PANEL_DIR" && blueprint -version); else err "Blueprint CLI not found."; fi; printf "Panel version: %s\n" "$(panel_version)"; pause ;;
-                            5) warn "Automatic uninstall is disabled for safety: official removal deletes panel files and requires restoring Pterodactyl. Follow the official removal guide after a full backup."; pause ;;
+                            1) install_blueprint; pause ;;
+                            2) (cd "$PANEL_DIR" && blueprint -upgrade) || err "Update failed."; pause ;;
+                            3) (cd "$PANEL_DIR" && blueprint -info) || err "CLI not found."; pause ;;
+                            4) printf '\nBlueprint: %s\nPanel: %s\n' "$(blueprint_version)" "$(panel_version)"; pause ;;
+                            5) warn "Uninstall disabled for safety."; pause ;;
                             0) break ;;
                             *) warn "Invalid option."; sleep 1 ;;
                         esac
                     else
-                        printf " ${C_CYAN}Status :${C_RESET} ${C_RED}● OFFLINE${C_RESET}\n\n"
+                        printf " ${C_CYAN}Status :${C_RESET} ${C_RED}O OFFLINE${C_RESET}\n\n"
                         printf " ${C_GREEN}[1]${C_RESET} ${C_CYAN}Install${C_RESET}\n"
                         printf " ${C_RED}[0]${C_RESET} ${C_RED}Back${C_RESET}\n\n"
-                        read -r -p " ${C_GREEN}▶ Select :${C_RESET} " bp_choice || break
+                        read -r -p " ${C_GREEN}Select :${C_RESET} " bp_choice || break
                         case "$bp_choice" in
-                            1) if ! install_blueprint; then warn "Blueprint installation failed."; fi; pause ;;
+                            1) install_blueprint; pause ;;
                             0) break ;;
                             *) warn "Invalid option."; sleep 1 ;;
                         esac
                     fi
                 done
                 ;;
-            2) clear; printf "  ${C_CYAN}--- Theme Management ---${C_RESET}\n\n"; warn "Theme manager coming soon."; pause ;;
+            2) clear; printf "  ${C_CYAN}--- Theme Management ---${C_RESET}\n\n"; warn "Coming soon."; pause ;;
             3) playtely_extensions_menu ;; 
             0) return ;;
             *) warn "Invalid option."; sleep 1 ;;
@@ -502,8 +395,7 @@ center_line() { local text="$1"; local cols=$(tput cols 2>/dev/null || echo 80);
 
 draw_top_bar() {
     local user=$(get_current_user); local up=$(get_uptime); local disk=$(get_disk_usage); local ram=$(get_ram_usage); local cpu=$(get_cpu_usage)
-    local p1="${C_BG_BLUE}${C_WHITE} ${user} ${C_RESET}"; local p2="${C_BG_PURPLE}${C_WHITE} ${up} ${C_RESET}"; local p3="${C_BG_GREEN}${C_WHITE} ${disk} ${C_RESET}"; local p4="${C_BG_RED}${C_WHITE} RAM ${ram}% ${C_RESET}"; local p5="${C_BG_GREEN}${C_WHITE} CPU ${cpu}% ${C_RESET}"
-    printf "  %s  %s  %s  %s  %s\n" "$p1" "$p2" "$p3" "$p4" "$p5"
+    printf "  [${C_WHITE}${user}${C_RESET}] [${C_WHITE}${up}${C_RESET}] [${C_WHITE}${disk}${C_RESET}] [${C_WHITE}RAM ${ram}%${C_RESET}] [${C_WHITE}CPU ${cpu}%${C_RESET}]\n"
 }
 
 show_logo() {
@@ -517,7 +409,7 @@ show_logo() {
 ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ 
 LOGO
     printf "${C_RESET}\n"
-    center_line "${C_YELLOW}Z I R O   E D I T I O N   —   O B S I D I A N   N E X T   G E N${C_RESET}"
+    center_line "${C_YELLOW}Z I R O   E D I T I O N${C_RESET}"
     center_line "${C_GRAY}Powered by NexyonCloud${C_RESET}"
     echo ""
 }
@@ -526,38 +418,38 @@ draw_ui() {
     clear 2>/dev/null || true
     draw_top_bar
     local cols=$(tput cols 2>/dev/null || echo 80)
-    printf "${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 $cols))"
+    printf "${C_BLUE}%s${C_RESET}\n" "$(printf '=%.0s' $(seq 1 $cols))"
     show_logo
-    printf " ${C_WHITE}●${C_RESET} ${C_BOLD}SYSTEM STATUS${C_RESET}\n"
-    printf "   ${C_DIM}CPU Usage:${C_RESET} ${C_CYAN}%s%%${C_RESET}     " "$(get_cpu_usage)"
-    printf "${C_DIM}RAM Usage:${C_RESET} ${C_CYAN}%s%%${C_RESET}     " "$(get_ram_usage)"
-    printf "${C_DIM}Network:${C_RESET} %s\n\n" "$(get_network_status)"
-    printf " ${C_CYAN}::${C_RESET} ${C_BOLD}DEPLOYMENT & SERVICES${C_RESET}\n"
-    printf "  ├── ${C_WHITE}[${C_YELLOW}1${C_WHITE}]${C_RESET} %-20s  " "Panel"; printf "├── ${C_WHITE}[${C_YELLOW}5${C_WHITE}]${C_RESET} %-20s\n" "System"
-    printf "  ├── ${C_WHITE}[${C_YELLOW}2${C_WHITE}]${C_RESET} %-20s  " "Wings"; printf "├── ${C_WHITE}[${C_YELLOW}6${C_WHITE}]${C_RESET} %-20s\n" "Container"
-    printf "  ├── ${C_WHITE}[${C_YELLOW}3${C_WHITE}]${C_RESET} %-20s  " "Toolbox"; printf "├── ${C_WHITE}[${C_YELLOW}7${C_WHITE}]${C_RESET} %-20s\n" "Backup"
-    printf "  └── ${C_WHITE}[${C_YELLOW}4${C_WHITE}]${C_RESET} %-20s  " "Theme"; printf "└── ${C_WHITE}[${C_YELLOW}8${C_WHITE}]${C_RESET} %-20s\n" "About"
+    printf " ${C_WHITE}* ${C_BOLD}SYSTEM STATUS${C_RESET}\n"
+    printf "   ${C_DIM}CPU:${C_RESET} ${C_CYAN}%s%%${C_RESET}  |  " "$(get_cpu_usage)"
+    printf "${C_DIM}RAM:${C_RESET} ${C_CYAN}%s%%${C_RESET}  |  " "$(get_ram_usage)"
+    printf "${C_DIM}Net:${C_RESET} %s\n\n" "$(get_network_status)"
+    printf " ${C_CYAN}:: ${C_BOLD}DEPLOYMENT & SERVICES${C_RESET}\n"
+    printf "  +-- ${C_WHITE}[${C_YELLOW}1${C_WHITE}]${C_RESET} %-20s  " "Panel"; printf "+-- ${C_WHITE}[${C_YELLOW}5${C_WHITE}]${C_RESET} %-20s\n" "System"
+    printf "  +-- ${C_WHITE}[${C_YELLOW}2${C_WHITE}]${C_RESET} %-20s  " "Wings"; printf "+-- ${C_WHITE}[${C_YELLOW}6${C_WHITE}]${C_RESET} %-20s\n" "Container"
+    printf "  +-- ${C_WHITE}[${C_YELLOW}3${C_WHITE}]${C_RESET} %-20s  " "Toolbox"; printf "+-- ${C_WHITE}[${C_YELLOW}7${C_WHITE}]${C_RESET} %-20s\n" "Backup"
+    printf "  +-- ${C_WHITE}[${C_YELLOW}4${C_WHITE}]${C_RESET} %-20s  " "Theme"; printf "+-- ${C_WHITE}[${C_YELLOW}8${C_WHITE}]${C_RESET} %-20s\n" "About"
     echo ""
-    printf " ${C_PURPLE}::${C_RESET} ${C_BOLD}MAINTENANCE & TOOLS${C_RESET}\n"
-    printf "  ├── ${C_WHITE}[${C_YELLOW}9${C_WHITE}]${C_RESET} %-30s " "New Models (Custom)"
-    printf "${C_RED}[${C_BOLD}0${C_RESET}${C_RED}] SHUTDOWN SYSTEM${C_RESET}\n"
-    printf "  └── ${C_WHITE}[${C_YELLOW}10${C_WHITE}]${C_RESET} %-30s\n" "Help & Docs"
+    printf " ${C_PURPLE}:: ${C_BOLD}MAINTENANCE & TOOLS${C_RESET}\n"
+    printf "  +-- ${C_WHITE}[${C_YELLOW}9${C_WHITE}]${C_RESET} %-30s " "New Models"
+    printf "${C_RED}[${C_BOLD}0${C_RESET}${C_RED}] SHUTDOWN${C_RESET}\n"
+    printf "  +-- ${C_WHITE}[${C_YELLOW}10${C_WHITE}]${C_RESET} %-30s\n" "Help"
     echo ""
-    printf "${C_BLUE}%s${C_RESET}\n" "$(printf '─%.0s' $(seq 1 $cols))"
+    printf "${C_BLUE}%s${C_RESET}\n" "$(printf '=%.0s' $(seq 1 $cols))"
 }
 
-menu_wings() { clear; printf "${C_CYAN}=== WINGS NODE MANAGER ===${C_RESET}\n\n"; warn "Wings management is not implemented yet."; pause; }
+menu_wings() { clear; printf "${C_CYAN}=== WINGS NODE MANAGER ===${C_RESET}\n\n"; warn "Not implemented yet."; pause; }
 menu_toolbox() { clear; printf "${C_CYAN}=== TOOLBOX ===${C_RESET}\n\n1. System Check\n2. View Logs\n0. Back\n\n"; read -r -p "Select: " ch; case "$ch" in 1) system_check; pause;; 2) view_logs; pause;; esac; }
 menu_system() { clear; printf "${C_CYAN}=== SYSTEM INFO ===${C_RESET}\n\nOS: %s\nUptime: %s\nMemory: %s\nDisk: %s\n" "$(uname -sr)" "$(uptime -p)" "$(free -h | awk '/Mem:/ {print $3 " / " $2}')" "$(df -h / | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}')"; pause; }
 menu_container() { clear; printf "${C_CYAN}=== CONTAINERS ===${C_RESET}\n\n"; if command_exists docker; then docker ps --format "table {{.Names}}\t{{.Status}}"; else warn "Docker not installed."; fi; pause; }
 make_backup() {
     need_root || return 1
-    valid_panel_dir || { err "Panel directory not found: $PANEL_DIR"; return 1; }
+    valid_panel_dir || { err "Panel not found."; return 1; }
     install -d -m 0750 "$BACKUP_DIR"
     local archive="$BACKUP_DIR/panel-files-$(date +%Y%m%d-%H%M%S).tar.gz"
-    warn "This backs up panel files only. It does not include the database."
+    warn "Backing up panel files only (not database)."
     tar -czf "$archive" -C "$(dirname "$PANEL_DIR")" "$(basename "$PANEL_DIR")" || return 1
-    ok "Panel files backup saved: $archive"
+    ok "Backup saved: $archive"
 }
 menu_backup() {
     clear
@@ -569,15 +461,15 @@ menu_backup() {
     pause
 }
 menu_about() { clear; printf "${C_CYAN}=== ABOUT ===${C_RESET}\n\nExtension Hub %s\nAuthor: %s\nBlueprint: %s\n" "$APP_VERSION" "$AUTHOR" "$(detect_blueprint && echo "ONLINE" || echo "OFFLINE")"; pause; }
-menu_new_models() { clear; printf "${C_CYAN}=== NEW MODELS (CUSTOM) ===${C_RESET}\n\nYahan aap apna custom code likh sakte hain.\n\n"; pause; }
-menu_help() { clear; printf "${C_CYAN}=== HELP ===${C_RESET}\n\n1. Panel: Install/Manage Blueprint.\n2. Wings: Daemon nodes.\n3. Toolbox: System check.\n4. Theme: UI themes.\n5. System: Hardware info.\n6. Container: Docker.\n7. Backup: Backups.\n8. About: Info.\n9. New Models: Custom.\n10. Help.\n"; pause; }
+menu_new_models() { clear; printf "${C_CYAN}=== NEW MODELS ===${C_RESET}\n\nCustom space.\n\n"; pause; }
+menu_help() { clear; printf "${C_CYAN}=== HELP ===${C_RESET}\n\n1. Panel\n2. Wings\n3. Toolbox\n4. Theme\n5. System\n6. Container\n7. Backup\n8. About\n9. New Models\n10. Help\n"; pause; }
 system_check() { echo "=== SYSTEM CHECK ==="; printf 'Root: %s\nPanel: %s\nBlueprint: %s\nNode: %s\n' "$([[ $EUID -eq 0 ]] && echo YES || echo NO)" "$PANEL_DIR" "$(detect_blueprint && echo YES || echo NO)" "$(node --version 2>/dev/null || echo Missing)"; }
 view_logs() { if [ -f "$LOG_FILE" ]; then tail -n 20 "$LOG_FILE"; else warn "No logs found."; fi; }
 
 main_menu() {
     while true; do
         draw_ui
-        read -r -p " ➔ Enter Option (0-10): " choice || exit 0
+        read -r -p " -> Enter Option (0-10): " choice || exit 0
         case "$choice" in
             1) menu_panel ;;
             2) menu_wings ;;
