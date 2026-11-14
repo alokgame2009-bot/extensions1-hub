@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.3 - Fast & Fixed
-set -Eeuo pipefail
+# Extension Hub v1.4 - Fast & Crash-Proof
+set -Eeuo
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.3"
+APP_VERSION="v1.4"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -144,8 +144,10 @@ playtely_extensions_menu() {
     )
     declare -a selected_extensions=()
 
-    # EK BAAR MEIN SAARI INSTALLED LIST NIKAAL LEIN (FAST)
+    # Ensure file exists
     local installed_list="/tmp/installed_extensions.cache"
+    touch "$installed_list"
+
     if [[ -d "$PANEL_DIR" ]]; then
         info "Loading installed extensions list..."
         (cd "$PANEL_DIR" && php artisan tinker --execute="
@@ -156,9 +158,9 @@ playtely_extensions_menu() {
                     echo DB::table('blueprint_extensions')->pluck('name')->implode(PHP_EOL);
                 }
             } catch(\Exception \$e) {}
-        " 2>/dev/null) > "$installed_list"
-        ls -1 "$PANEL_DIR/extensions/" 2>/dev/null >> "$installed_list"
-        ls -1 "$PANEL_DIR/app/Extensions/" 2>/dev/null >> "$installed_list"
+        " 2>/dev/null) >> "$installed_list" || true
+        ls -1 "$PANEL_DIR/extensions/" 2>/dev/null >> "$installed_list" || true
+        ls -1 "$PANEL_DIR/app/Extensions/" 2>/dev/null >> "$installed_list" || true
     fi
 
     while true; do
@@ -210,7 +212,7 @@ playtely_extensions_menu() {
                     for sel in "${selected_extensions[@]}"; do
                         for ext in "${extensions[@]}"; do
                             IFS='|' read -r id name <<< "$ext"
-                            if [ "$id" == "$sel" ]; then install_ext "$id" "$name"; fi
+                            if [ "$id" == "$sel" ]; then install_ext "$id" "$name" || true; fi
                         done
                     done
                     echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; 
@@ -225,7 +227,7 @@ playtely_extensions_menu() {
                     for sel in "${selected_extensions[@]}"; do
                         for ext in "${extensions[@]}"; do
                             IFS='|' read -r id name <<< "$ext"
-                            if [ "$id" == "$sel" ]; then remove_ext "$id" "$name"; fi
+                            if [ "$id" == "$sel" ]; then remove_ext "$id" "$name" || true; fi
                         done
                     done
                     echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; 
