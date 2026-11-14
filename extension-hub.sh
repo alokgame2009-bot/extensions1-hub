@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.0 - Ultimate Status Check
+# Extension Hub v1.1 - Ultimate Fixed
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.0"
+APP_VERSION="v1.1"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -40,7 +40,19 @@ pause() { echo; read -r -p "Press Enter to continue..." _ || true; }
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 need_root() { [[ "$EUID" -eq 0 ]] || { err "Run as root."; return 1; }; }
 valid_panel_dir() { [[ -d "$PANEL_DIR" && -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/composer.json" ]]; }
-detect_blueprint() { valid_panel_dir && [[ -f "$PANEL_DIR/blueprint.sh" && -f "$PANEL_DIR/.blueprintrc" ]]; }
+
+# STRICT DETECT BLUEPRINT: Dono files + DB check
+detect_blueprint() { 
+    valid_panel_dir || return 1
+    [[ -f "$PANEL_DIR/blueprint.sh" ]] || return 1
+    [[ -f "$PANEL_DIR/.blueprintrc" ]] || return 1
+    # Check karein ki artisan command register hai ya nahi
+    if ! (cd "$PANEL_DIR" && php artisan list 2>/dev/null | grep -q "blueprint"); then
+        return 1
+    fi
+    return 0
+}
+
 blueprint_version() { [[ -f "$PANEL_DIR/blueprint.sh" ]] && grep -Eio '([0-9]+\.){1,3}[0-9]+' "$PANEL_DIR/blueprint.sh" | head -n1 || echo ""; }
 panel_version() { valid_panel_dir && command_exists php && (cd "$PANEL_DIR" && php artisan --version 2>/dev/null | sed 's/^Laravel Framework //') || echo "Unknown"; }
 
@@ -122,7 +134,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Final - File Based Check)
+# EXTENSIONS GRID MENU
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -166,15 +178,12 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Status Check Left (File/Folder check - Nobita Cloud style)
+            # Status Check Left (File Based)
             local status1="○"; local status_col1="${C_RED}"
-            # Check in all possible locations
             if [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || \
                [[ -f "$PANEL_DIR/app/Extensions/$name1.php" ]] || \
                [[ -d "$PANEL_DIR/extensions/$name1" ]] || \
-               [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]] || \
-               [[ -d "$PANEL_DIR/$name1" ]] || \
-               [[ -f "$PANEL_DIR/app/Extensions/Themes/$name1" ]]; then
+               [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]]; then
                 status1="●"; status_col1="${C_GREEN}"
             fi
             
@@ -188,14 +197,12 @@ playtely_extensions_menu() {
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
                 
-                # Status Check Right
+                # Status Check Right (File Based)
                 local status2="○"; local status_col2="${C_RED}"
                 if [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || \
                    [[ -f "$PANEL_DIR/app/Extensions/$name2.php" ]] || \
                    [[ -d "$PANEL_DIR/extensions/$name2" ]] || \
-                   [[ -f "$PANEL_DIR/extensions/$name2.blueprint" ]] || \
-                   [[ -d "$PANEL_DIR/$name2" ]] || \
-                   [[ -f "$PANEL_DIR/app/Extensions/Themes/$name2" ]]; then
+                   [[ -f "$PANEL_DIR/extensions/$name2.blueprint" ]]; then
                     status2="●"; status_col2="${C_GREEN}"
                 fi
                 
