@@ -104,7 +104,7 @@ install_blueprint() {
         [[ "$answer" =~ ^[Yy]$ ]] || return 0
     fi
     
-    info "Step 1/5: Installing dependencies (Node.js, Yarn, etc)..."
+    info "Step 1/5: Installing dependencies..."
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git unzip wget zip
     install -d -m 0755 /etc/apt/keyrings
@@ -115,41 +115,38 @@ install_blueprint() {
     if ! command -v yarn >/dev/null 2>&1; then npm install --global yarn >/dev/null 2>&1; fi
     ok "Dependencies installed."
     
-    info "Step 2/5: Downloading latest Blueprint release..."
+    info "Step 2/5: Downloading Blueprint..."
     TMP_DIR="$(mktemp -d)"
-    if ! curl -fL --retry 3 "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -o "$TMP_DIR/release.zip"; then err "Failed to download Blueprint."; return 1; fi
+    if ! curl -fL --retry 3 "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -o "$TMP_DIR/release.zip"; then err "Download failed."; return 1; fi
     
-    info "Step 3/5: Extracting files into panel..."
+    info "Step 3/5: Extracting files..."
     cd "$PANEL_DIR" || return 1
     cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
     unzip -o release.zip >/dev/null
     rm -f release.zip
     
-    info "Step 4/5: Installing Yarn packages (This may take a while)..."
+    info "Step 4/5: Installing Yarn packages..."
     yarn install --silent >/dev/null 2>&1 || yarn install
     
-    info "Step 5/5: Running Blueprint setup script..."
+    info "Step 5/5: Running setup..."
     chmod +x "$PANEL_DIR/blueprint.sh"
     cd "$PANEL_DIR" && bash ./blueprint.sh
     
     chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
     fix_sagatrashbin
     
-    # Verify
     if php artisan list 2>/dev/null | grep -q "blueprint:install"; then
-        ok "Blueprint registered successfully! You can now install extensions."
-    elif detect_blueprint; then
-        warn "Blueprint files exist but CLI not registered. Trying manual register..."
+        ok "Blueprint registered successfully!"
+    else
+        warn "Trying manual register..."
         php artisan package:discover --ansi >/dev/null 2>&1 || true
         composer dump-autoload --no-scripts -q 2>/dev/null || true
         php artisan clear-compiled >/dev/null 2>&1 || true
         if php artisan list 2>/dev/null | grep -q "blueprint:install"; then
-            ok "Blueprint registered after manual fix!"
+            ok "Blueprint registered!"
         else
-            err "Blueprint CLI still not registered. Check /var/www/pterodactyl/config/app.php"
+            err "Blueprint CLI still not registered."
         fi
-    else
-        err "Installation finished but verification failed."
     fi
 }
 
