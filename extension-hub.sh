@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Extension Hub v1.4 - Fully Working (Real Status Check)
+# Extension Hub v1.5 - Fully Fixed & Cleaned
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.4"
+APP_VERSION="v1.5"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
@@ -122,7 +122,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Fixed Status Check)
+# EXTENSIONS GRID MENU (Fixed Status)
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -172,7 +172,7 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Status Check Left (Database list check)
+            # Status Check Left
             local status1="○"; local status_col1="${C_RED}"
             if echo "$installed_list" | grep -qi "^${name1}$"; then
                 status1="●"; status_col1="${C_GREEN}"
