@@ -89,152 +89,82 @@ get_current_user() { echo "${USER:-root}"; }
 # ==========================================
 # REAL BLUEPRINT OPERATIONS
 # ==========================================
-install_blueprint() {
-    need_root || return 1
-    
-    if detect_blueprint; then
-        warn "Blueprint already installed. Reinstalling..."
-        read -r -p "Reinstall? [y/N]: " answer
-        [[ "$answer" =~ ^[Yy]$ ]] || return 0
-    else
-        echo; warn "This will install Blueprint Framework into: $PANEL_DIR"
-        read -r -p "Continue? [y/N]: " answer
-        [[ "$answer" =~ ^[Yy]$ ]] || return 0
-    fi
-    
-    info "Fixing Node.js repository conflict..."
-    rm -f /etc/apt/keyrings/nodesource.gpg /usr/share/keyrings/nodesource.gpg /etc/apt/sources.list.d/nodesource.list 2>/dev/null || true
-    mkdir -p /etc/apt/keyrings
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg 2>/dev/null
-    chmod 644 /etc/apt/keyrings/nodesource.gpg
-    echo 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
-    
-    info "Step 1/5: Installing dependencies..."
-    apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git unzip wget zip
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
-    if ! command -v yarn >/dev/null 2>&1; then npm install --global yarn >/dev/null 2>&1; fi
-    ok "Dependencies installed."
-    
-    info "Step 2/5: Downloading Blueprint..."
-    TMP_DIR="$(mktemp -d)"
-    if ! curl -fL --retry 3 "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -o "$TMP_DIR/release.zip"; then err "Download failed."; return 1; fi
-    
-    info "Step 3/5: Extracting files..."
-    cd "$PANEL_DIR" || return 1
-    cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
-    unzip -o release.zip >/dev/null
-    rm -f release.zip
-    
-    info "Step 4/5: Installing Yarn packages..."
-    yarn install --silent >/dev/null 2>&1 || yarn install
-    
-    info "Step 5/5: Running setup..."
-    chmod +x "$PANEL_DIR/blueprint.sh"
-    cd "$PANEL_DIR" && bash ./blueprint.sh
-    
-    chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
-    
-    if [[ -f "$PANEL_DIR/app/BlueprintFramework/BlueprintServiceProvider.php" ]]; then
-        if ! grep -q "BlueprintFramework" "$PANEL_DIR/config/app.php" 2>/dev/null; then
-            sed -i "/App\\\\Providers\\\\AppServiceProvider::class,/a \        App\\\\BlueprintFramework\\\\BlueprintServiceProvider::class," "$PANEL_DIR/config/app.php" 2>/dev/null || true
-        fi
-    fi
-    
-    composer dump-autoload --no-scripts -q 2>/dev/null || true
-    php artisan package:discover >/dev/null 2>&1 || true
-    php artisan clear-compiled >/dev/null 2>&1 || true
-    rm -rf "$PANEL_DIR/bootstrap/cache/"*.php 2>/dev/null || true
-    
-    fix_sagatrashbin
-    
-    if php artisan list 2>/dev/null | grep -q "blueprint:install"; then
-        ok "Blueprint installed and registered successfully!"
-    else
-        err "Blueprint CLI still not registered."
-    fi
-}
+Install Blueprint
+Get Blueprint installed onto your Pterodactyl panel
+Emma
+Define Pterodactyl directory
+Define your Pterodactyl directory, we'll use this later in the guide. If your Pterodactyl webserver is not located in this directory, change the path.
 
-update_blueprint() {
-    need_root || return 1
-    detect_blueprint || { err "Blueprint not installed."; return 1; }
-    
-    warn "This will update Blueprint to the latest version."
-    read -r -p "Continue? [y/N]: " answer
-    [[ "$answer" =~ ^[Yy]$ ]] || return 0
-    
-    info "Downloading latest Blueprint..."
-    TMP_DIR="$(mktemp -d)"
-    if ! curl -fL --retry 3 "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -o "$TMP_DIR/release.zip"; then err "Download failed."; return 1; fi
-    
-    info "Extracting..."
-    cd "$PANEL_DIR" || return 1
-    cp -f "$TMP_DIR/release.zip" "$PANEL_DIR/release.zip"
-    unzip -o release.zip >/dev/null
-    rm -f release.zip
-    
-    info "Installing Yarn packages..."
-    yarn install --silent >/dev/null 2>&1 || yarn install
-    
-    info "Running setup..."
-    chmod +x "$PANEL_DIR/blueprint.sh"
-    cd "$PANEL_DIR" && bash ./blueprint.sh
-    
-    chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
-    composer dump-autoload --no-scripts -q 2>/dev/null || true
-    php artisan package:discover >/dev/null 2>&1 || true
-    php artisan clear-compiled >/dev/null 2>&1 || true
-    
-    ok "Blueprint updated successfully!"
-    blueprint_version
-}
+bash
 
-uninstall_blueprint() {
-    need_root || return 1
-    detect_blueprint || { err "Blueprint not installed."; return 1; }
-    
-    warn "WARNING: This will remove Blueprint files from $PANEL_DIR"
-    warn "Panel will remain intact but Blueprint will stop working."
-    read -r -p "Type 'yes' to confirm uninstall: " answer
-    [[ "$answer" == "yes" ]] || { info "Cancelled."; return 0; }
-    
-    info "Removing Blueprint files..."
-    rm -f "$PANEL_DIR/blueprint.sh" "$PANEL_DIR/.blueprintrc" "$PANEL_DIR/release.zip"
-    rm -rf "$PANEL_DIR/app/BlueprintFramework"
-    rm -rf "$PANEL_DIR/.blueprint"
-    
-    if grep -q "BlueprintFramework" "$PANEL_DIR/config/app.php" 2>/dev/null; then
-        sed -i '/BlueprintFramework/d' "$PANEL_DIR/config/app.php" 2>/dev/null || true
-    fi
-    
-    composer dump-autoload --no-scripts -q 2>/dev/null || true
-    php artisan package:discover >/dev/null 2>&1 || true
-    php artisan clear-compiled >/dev/null 2>&1 || true
-    rm -rf "$PANEL_DIR/bootstrap/cache/"*.php 2>/dev/null || true
-    
-    ok "Blueprint uninstalled successfully."
-}
+Copy
+# Use this command to set a $PTERODACTYL_DIRECTORY variable
+# for use later in this guide.
+export PTERODACTYL_DIRECTORY=/var/www/pterodactyl
+Download and install Blueprint
+Download the latest version of Blueprint onto your server by either downloading the latest release from GitHub or running the commands below (which will save the file as release.zip and extract it).
 
-blueprint_info_menu() {
-    clear
-    printf "${C_CYAN}================================================${C_RESET}\n"
-    printf "${C_CYAN}           BLUEPRINT INFO${C_RESET}\n"
-    printf "${C_CYAN}================================================${C_RESET}\n\n"
-    
-    printf "Panel Directory : %s\n" "$PANEL_DIR"
-    printf "Blueprint File  : %s\n" "$([[ -f "$PANEL_DIR/blueprint.sh" ]] && echo "EXISTS" || echo "MISSING")"
-    printf "Config File     : %s\n" "$([[ -f "$PANEL_DIR/.blueprintrc" ]] && echo "EXISTS" || echo "MISSING")"
-    printf "CLI Registered  : %s\n" "$(php artisan list 2>/dev/null | grep -q "blueprint:install" && echo "YES" || echo "NO")"
-    printf "Blueprint Ver   : %s\n" "$(blueprint_version)"
-    printf "Panel Ver       : %s\n" "$(panel_version)"
-    printf "Node.js         : %s\n" "$(node --version 2>/dev/null || echo "Missing")"
-    printf "Yarn            : %s\n" "$(yarn --version 2>/dev/null || echo "Missing")"
-    printf "PHP             : %s\n" "$(php --version 2>/dev/null | head -n1 || echo "Missing")"
-    printf "Composer        : %s\n" "$(composer --version 2>/dev/null || echo "Missing")"
-    echo
-    pause
-}
+bash
 
+Copy
+# Install curl, wget and unzip if you haven't already
+sudo apt install -y curl wget unzip
+
+# Navigate to your Pterodactyl directory
+cd $PTERODACTYL_DIRECTORY
+
+# Download and unzip Blueprint's latest release
+wget "https://github.com/BlueprintFramework/framework/releases/latest/download/release.zip" -O "$PTERODACTYL_DIRECTORY/release.zip"
+unzip -o release.zip
+Dependencies
+Blueprint, just like Pterodactyl, relies on a few dependencies to function. Install them through the commands below.
+
+bash
+
+Copy
+# Install dependencies
+sudo apt install -y ca-certificates curl git gnupg unzip wget zip
+
+# Add Node.js apt repository
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+sudo apt update
+sudo apt install -y nodejs
+
+# cd into Pterodactyl, install yarn and node dependencies
+cd $PTERODACTYL_DIRECTORY
+npm i -g yarn
+yarn install
+Configure Blueprint
+This step allows Blueprint to function and know where itself and Pterodactyl are located and which permissions to use. Create a file called .blueprintrc inside of your Pterodactyl directory to begin.
+
+bash
+
+Copy
+# Creates a .blueprintrc file in your Pterodactyl directory
+touch $PTERODACTYL_DIRECTORY/.blueprintrc
+Modify the $WEBUSER, $USERSHELL and $PERMISSIONS values to match your environment. Provided below is the standard configuration for Debian-based systems, but you might need to make your own modifications.
+
+bash
+
+Copy
+# Writes data to your .blueprintrc file
+echo \
+'WEBUSER="www-data";
+OWNERSHIP="www-data:www-data";
+USERSHELL="/bin/bash";' > $PTERODACTYL_DIRECTORY/.blueprintrc
+Run Blueprint
+All that's left is giving blueprint.sh execute permissions and running it. Blueprint will then do the necessary commands to operate correctly automatically.
+
+bash
+
+Copy
+# Give blueprint.sh execute permissions
+chmod +x $PTERODACTYL_DIRECTORY/blueprint.sh
+
+# Run blueprint.sh
+bash $PTERODACTYL_DIRECTORY/blueprint.sh
 # ==========================================
 # REAL EXTENSION LOGIC
 # ==========================================
