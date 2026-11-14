@@ -93,9 +93,8 @@ get_current_user() { echo "${USER:-root}"; }
 install_blueprint() {
     need_root || return 1
     
-    # Agar already installed hai toh reinstall karein
     if detect_blueprint; then
-        warn "Blueprint already installed. Reinstalling to register commands..."
+        warn "Blueprint already installed. Reinstalling..."
         read -r -p "Reinstall? [y/N]: " answer
         [[ "$answer" =~ ^[Yy]$ ]] || return 0
     else
@@ -133,23 +132,30 @@ install_blueprint() {
     cd "$PANEL_DIR" && bash ./blueprint.sh
     
     chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
+    
+    # MANUAL REGISTER SERVICE PROVIDER
+    info "Manually registering Blueprint service provider..."
+    if [[ -f "$PANEL_DIR/app/BlueprintFramework/BlueprintServiceProvider.php" ]]; then
+        if ! grep -q "BlueprintFramework" "$PANEL_DIR/config/app.php" 2>/dev/null; then
+            sed -i "/App\\\\Providers\\\\AppServiceProvider::class,/a \        App\\\\BlueprintFramework\\\\BlueprintServiceProvider::class," "$PANEL_DIR/config/app.php" 2>/dev/null || true
+        fi
+    fi
+    
+    # Clear everything
+    composer dump-autoload --no-scripts -q 2>/dev/null || true
+    php artisan package:discover >/dev/null 2>&1 || true
+    php artisan clear-compiled >/dev/null 2>&1 || true
+    rm -rf "$PANEL_DIR/bootstrap/cache/"*.php 2>/dev/null || true
+    
     fix_sagatrashbin
     
     if php artisan list 2>/dev/null | grep -q "blueprint:install"; then
         ok "Blueprint registered successfully!"
     else
-        warn "Trying manual register..."
-        php artisan package:discover --ansi >/dev/null 2>&1 || true
-        composer dump-autoload --no-scripts -q 2>/dev/null || true
-        php artisan clear-compiled >/dev/null 2>&1 || true
-        if php artisan list 2>/dev/null | grep -q "blueprint:install"; then
-            ok "Blueprint registered!"
-        else
-            err "Blueprint CLI still not registered."
-        fi
+        err "Blueprint CLI still not registered."
+        warn "Check: grep -i blueprint $PANEL_DIR/config/app.php"
     fi
 }
-
 # ==========================================
 # REAL EXTENSION LOGIC (WITH AUTO FIX)
 # ==========================================
