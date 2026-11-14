@@ -122,7 +122,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Fixed Status)
+# EXTENSIONS GRID MENU (Real Database Status Check)
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -148,7 +148,7 @@ playtely_extensions_menu() {
     declare -a selected_extensions=()
 
     while true; do
-        # Fetch real installed list
+        # FETCH REAL INSTALLED EXTENSIONS FROM BLUEPRINT
         local installed_list=""
         if [[ -d "$PANEL_DIR" ]]; then
             installed_list=$(cd "$PANEL_DIR" && php artisan blueprint:list 2>/dev/null | grep -Eo '^[a-zA-Z0-9_]+' || echo "")
@@ -172,7 +172,7 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Status Check Left
+            # Status Check Left (Check from installed_list)
             local status1="○"; local status_col1="${C_RED}"
             if echo "$installed_list" | grep -qi "^${name1}$"; then
                 status1="●"; status_col1="${C_GREEN}"
