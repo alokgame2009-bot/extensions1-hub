@@ -258,6 +258,28 @@ install_ext() {
     return 0
 }
 
+extension_is_installed() {
+    local name="$1"
+    local root="$PANEL_DIR"
+
+    # Blueprint's own extension data directory (primary detection path).
+    [[ -d "$root/.blueprint/extensions/$name" ]] && return 0
+
+    # Compatibility with legacy layouts and extensions that expose PHP files.
+    [[ -d "$root/app/Extensions/$name" ]] && return 0
+    [[ -f "$root/app/Extensions/$name.php" ]] && return 0
+    [[ -d "$root/extensions/$name" ]] && return 0
+
+    # Some extensions create a registered folder under the Blueprint data tree.
+    if [[ -d "$root/.blueprint/extensions" ]]; then
+        find "$root/.blueprint/extensions" -mindepth 2 -maxdepth 2 \
+            -type d -name "$name" -print -quit 2>/dev/null | grep -q .
+        return $?
+    fi
+
+    return 1
+}
+
 remove_ext() {
     local ext_id="$1" ext_name="$2"
     need_root || return 1
@@ -315,7 +337,7 @@ playtely_extensions_menu() {
             done
             
             local status1="○"; local status_col1="${C_RED}"
-            if [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || [[ -f "$PANEL_DIR/app/Extensions/$name1.php" ]] || [[ -d "$PANEL_DIR/extensions/$name1" ]] || [[ -f "$PANEL_DIR/extensions/$name1.blueprint" ]]; then
+            if extension_is_installed "$name1"; then
                 status1="●"; status_col1="${C_GREEN}"
             fi
             
@@ -329,7 +351,7 @@ playtely_extensions_menu() {
                 done
                 
                 local status2="○"; local status_col2="${C_RED}"
-                if [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || [[ -f "$PANEL_DIR/app/Extensions/$name2.php" ]] || [[ -d "$PANEL_DIR/extensions/$name2" ]] || [[ -f "$PANEL_DIR/extensions/$name2.blueprint" ]]; then
+                if extension_is_installed "$name2"; then
                     status2="●"; status_col2="${C_GREEN}"
                 fi
                 
