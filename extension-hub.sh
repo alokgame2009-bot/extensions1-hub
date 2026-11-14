@@ -122,7 +122,7 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (Database Check)
+# EXTENSIONS GRID MENU (Bulletproof Status Check)
 # ==========================================
 playtely_extensions_menu() {
     local extensions=(
@@ -148,25 +148,24 @@ playtely_extensions_menu() {
     declare -a selected_extensions=()
 
     while true; do
-        # FETCH REAL INSTALLED EXTENSIONS FROM BLUEPRINT / DATABASE
+        # Har baar fresh check karein
         local installed_list=""
         if [[ -d "$PANEL_DIR" ]]; then
-            installed_list=$(cd "$PANEL_DIR" && php artisan blueprint:list 2>/dev/null | grep -Eo '^[a-zA-Z0-9_]+' || echo "")
+            # 1. Blueprint CLI se try karein
+            installed_list=$(cd "$PANEL_DIR" && php artisan blueprint:list 2>/dev/null | grep -Eo '^[a-zA-Z0-9_]+' || true)
             
+            # 2. Database se try karein
             if [[ -z "$installed_list" ]]; then
-                installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="echo \App\BlueprintFramework\Blueprint::getInstalledExtensions()->pluck('name')->implode(' ');" 2>/dev/null || echo "")
+                installed_list=$(cd "$PANEL_DIR" && php artisan tinker --execute="try { echo \App\BlueprintFramework\Blueprint::getInstalledExtensions()->pluck('name')->implode(' '); } catch(\Exception \$e) {}" 2>/dev/null || true)
+            fi
+            
+            # 3. Files folder se try karein
+            if [[ -z "$installed_list" ]]; then
+                installed_list=$(ls -1 "$PANEL_DIR/extensions/" 2>/dev/null || true)
             fi
             
             if [[ -z "$installed_list" ]]; then
-                installed_list=$(cd "$PANEL_DIR" && php -r '
-                    require "vendor/autoload.php";
-                    $app = require_once "bootstrap/app.php";
-                    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-                    try {
-                        $exts = DB::table("blueprint_extensions")->pluck("name")->toArray();
-                        echo implode(" ", $exts);
-                    } catch (\Exception $e) { echo ""; }
-                ' 2>/dev/null || echo "")
+                installed_list=$(ls -1 "$PANEL_DIR/app/Extensions/" 2>/dev/null || true)
             fi
         fi
 
@@ -188,9 +187,9 @@ playtely_extensions_menu() {
                 if [[ "$s" == "$id1" ]]; then sel1="[+]"; col1="${C_GREEN}"; fi
             done
             
-            # Status Check Left (DB)
+            # Status Check Left (Grep check on installed_list)
             local status1="○"; local status_col1="${C_RED}"
-            if echo "$installed_list" | grep -qi "\b${name1}\b"; then
+            if echo "$installed_list" | grep -qi "${name1}"; then
                 status1="●"; status_col1="${C_GREEN}"
             fi
             
@@ -204,9 +203,9 @@ playtely_extensions_menu() {
                     if [[ "$s" == "$id2" ]]; then sel2="[+]"; col2="${C_GREEN}"; fi
                 done
                 
-                # Status Check Right (DB)
+                # Status Check Right
                 local status2="○"; local status_col2="${C_RED}"
-                if echo "$installed_list" | grep -qi "\b${name2}\b"; then
+                if echo "$installed_list" | grep -qi "${name2}"; then
                     status2="●"; status_col2="${C_GREEN}"
                 fi
                 
