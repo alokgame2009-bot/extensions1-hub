@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Extension Hub v1.2 - Fully Working (With Status Dots)
+# Extension Hub v1.3 - Fixed Status & Cleaned Code
 set -Eeuo pipefail
 
 APP_NAME="Extension Hub"
-APP_VERSION="v1.2"
+APP_VERSION="v1.3"
 AUTHOR="Ziro"
 LOG_FILE="/var/log/extension-hub.log"
 TMP_DIR=""
 BASE_URL="https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main"
 PANEL_DIR="/var/www/pterodactyl"
-EXT_DIR="/var/www/pterodactyl/extensions"
 EXT_GITHUB_RAW="https://raw.githubusercontent.com/alokgame2009-bot/extension-hub/main/extensions"
 
 # ---------- colors ----------
@@ -56,7 +55,7 @@ get_ram_usage() {
     free -m 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' || echo "0"
 }
 get_network_status() { 
-    if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}● CONNECTED${C_RESET}"; else printf "${C_RED}● DISCONNECTED${C_RESET}"; fi
+    if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then printf "${C_GREEN}CONNECTED${C_RESET}"; else printf "${C_RED}DISCONNECTED${C_RESET}"; fi
 }
 get_uptime() { uptime -p 2>/dev/null | sed 's/up //; s/ weeks/ weeks,/; s/ days/ days,/' || echo "Unknown"; }
 get_disk_usage() { df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo "0%"; }
@@ -123,10 +122,9 @@ remove_ext() {
 }
 
 # ==========================================
-# EXTENSIONS GRID MENU (With Status Dots)
+# EXTENSIONS GRID MENU (Fixed Status)
 # ==========================================
 playtely_extensions_menu() {
-    # 66 Extensions List
     local extensions=(
         "1|adminauditlogs" "2|huxregister" "3|loader" "4|lyrdyannounce"
         "5|mclogs" "6|mcplugins" "7|mctools" "8|minecraftplayermanager"
@@ -170,7 +168,7 @@ playtely_extensions_menu() {
             
             # Status Check Left
             local status1="○"; local status_col1="${C_RED}"
-            if [[ -d "$EXT_DIR/$name1" ]] || [[ -f "$EXT_DIR/${name1}.blueprint" ]]; then
+            if [[ -d "$PANEL_DIR/app/Extensions/$name1" ]] || [[ -d "$PANEL_DIR/extensions/$name1" ]]; then
                 status1="●"; status_col1="${C_GREEN}"
             fi
             
@@ -186,7 +184,7 @@ playtely_extensions_menu() {
                 
                 # Status Check Right
                 local status2="○"; local status_col2="${C_RED}"
-                if [[ -d "$EXT_DIR/$name2" ]] || [[ -f "$EXT_DIR/${name2}.blueprint" ]]; then
+                if [[ -d "$PANEL_DIR/app/Extensions/$name2" ]] || [[ -d "$PANEL_DIR/extensions/$name2" ]]; then
                     status2="●"; status_col2="${C_GREEN}"
                 fi
                 
@@ -220,7 +218,7 @@ playtely_extensions_menu() {
                             if [ "$id" == "$sel" ]; then install_ext "$id" "$name"; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ All selected extensions processed!${C_RESET}"; pause
+                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
                 fi
                 ;;
             "r"|"R")
@@ -233,7 +231,7 @@ playtely_extensions_menu() {
                             if [ "$id" == "$sel" ]; then remove_ext "$id" "$name"; fi
                         done
                     done
-                    echo -e "\n${C_GREEN}✓ All selected extensions processed!${C_RESET}"; pause
+                    echo -e "\n${C_GREEN}✓ Process completed!${C_RESET}"; pause
                 fi
                 ;;
             *)
@@ -336,7 +334,7 @@ center_line() { local text="$1"; local cols=$(tput cols 2>/dev/null || echo 80);
 
 draw_top_bar() {
     local user=$(get_current_user); local up=$(get_uptime); local disk=$(get_disk_usage); local ram=$(get_ram_usage); local cpu=$(get_cpu_usage)
-    local p1="${C_BG_BLUE}${C_WHITE}  ${user} ${C_RESET}"; local p2="${C_BG_PURPLE}${C_WHITE}  ${up} ${C_RESET}"; local p3="${C_BG_GREEN}${C_WHITE}  ${disk} ${C_RESET}"; local p4="${C_BG_RED}${C_WHITE}  RAM ${ram}% ${C_RESET}"; local p5="${C_BG_GREEN}${C_WHITE} CPU ${cpu}% ${C_RESET}"
+    local p1="${C_BG_BLUE}${C_WHITE} ${user} ${C_RESET}"; local p2="${C_BG_PURPLE}${C_WHITE} ${up} ${C_RESET}"; local p3="${C_BG_GREEN}${C_WHITE} ${disk} ${C_RESET}"; local p4="${C_BG_RED}${C_WHITE} RAM ${ram}% ${C_RESET}"; local p5="${C_BG_GREEN}${C_WHITE} CPU ${cpu}% ${C_RESET}"
     printf "  %s  %s  %s  %s  %s\n" "$p1" "$p2" "$p3" "$p4" "$p5"
 }
 
